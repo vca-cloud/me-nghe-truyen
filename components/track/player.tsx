@@ -60,6 +60,10 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(funct
     const audio = audioRef.current
     if (!audio) return
     try {
+      if (audio.ended || (audio.duration && audio.currentTime >= audio.duration - 0.3)) {
+        audio.currentTime = 0
+        startedRef.current = false
+      }
       await audio.play()
     } catch {
       setError("Không thể phát file audio. Hãy kiểm tra URL R2 công khai.")
@@ -124,6 +128,7 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(funct
         onPause={() => setIsPlaying(false)}
         onEnded={() => {
           setIsPlaying(false)
+          startedRef.current = false
           onEnded?.()
           if (!onEnded) navigate(nextTrackId)
         }}

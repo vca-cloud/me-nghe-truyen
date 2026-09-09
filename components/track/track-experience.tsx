@@ -57,9 +57,10 @@ export function TrackExperience({
     }
   }
 
-  const selectNextEpisode = () => {
-    const next = availableEpisodes[selectedIndex + 1]
-    if (next) setSelectedNumber(next.episode_number)
+  const handleEnded = () => {
+    setIsUnlocked(false)
+    setPendingEpisode(null)
+    setShowAffiliate(false)
   }
 
   const handleUnlock = () => {
@@ -120,7 +121,7 @@ export function TrackExperience({
         episodeTitle={`Tập ${selectedEpisode.episode_number}: ${selectedEpisode.title}`}
         previousTrackId={selectedIndex === 0 ? previousTrackId : undefined}
         nextTrackId={selectedIndex === availableEpisodes.length - 1 ? nextTrackId : undefined}
-        onEnded={selectNextEpisode}
+        onEnded={handleEnded}
         isUnlocked={isUnlocked}
         onShowAffiliate={() => setShowAffiliate(true)}
       />

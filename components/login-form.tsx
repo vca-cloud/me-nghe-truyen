@@ -1,11 +1,11 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { cn } from "@/lib/utils"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { supabase } from "@/lib/supabase"
+import { createClient } from "@/lib/supabase-client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field"
@@ -13,8 +13,18 @@ import { Input } from "@/components/ui/input"
 
 const inputClass = "dark:bg-[#9ECDDD] dark:text-[#154B95] dark:placeholder:text-[#2D74A8]"
 
+async function syncUser(user: { id: string; email?: string; created_at?: string; user_metadata?: Record<string, unknown> } | null) {
+  if (!user?.id || !user.email) return
+  await fetch("/api/sync-user", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ user }),
+  })
+}
+
 export function LoginForm({ className, ...props }: React.ComponentProps<"div">) {
   const router = useRouter()
+  const supabase = useMemo(() => createClient(), [])
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
@@ -22,9 +32,10 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
   const login = async (event: React.FormEvent) => {
     event.preventDefault()
     setLoading(true)
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
     setLoading(false)
     if (error) { toast.error(`Đăng nhập thất bại: ${error.message}`); return }
+    await syncUser(data.user)
     toast.success("Đăng nhập thành công")
     router.push("/")
     router.refresh()

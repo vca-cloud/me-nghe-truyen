@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
+import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -8,11 +9,22 @@ import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui
 import { Input } from "@/components/ui/input"
 import Link from "next/link"
 import { toast } from "sonner"
-import { supabase } from "@/lib/supabase"
+import { createClient } from "@/lib/supabase-client"
 
 const inputClass = "dark:bg-[#9ECDDD] dark:text-[#154B95] dark:placeholder:text-[#2D74A8]"
 
+async function syncUser(user: { id: string; email?: string; created_at?: string; user_metadata?: Record<string, unknown> } | null) {
+  if (!user?.id || !user.email) return
+  await fetch("/api/sync-user", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ user }),
+  })
+}
+
 export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
+  const router = useRouter()
+  const supabase = useMemo(() => createClient(), [])
   const [form, setForm] = useState({ name: "", email: "", password: "", confirm: "" })
   const [loading, setLoading] = useState(false)
 
@@ -21,10 +33,37 @@ export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
     if (form.password.length < 8) { toast.error("Mật khẩu phải có ít nhất 8 ký tự"); return }
     if (form.password !== form.confirm) { toast.error("Mật khẩu xác nhận không khớp"); return }
     setLoading(true)
-    const { error } = await supabase.auth.signUp({ email: form.email, password: form.password, options: { data: { full_name: form.name } } })
+    const { data, error } = await supabase.auth.signUp({
+      email: form.email,
+      password: form.password,
+      options: { data: { full_name: form.name }, emailRedirectTo: `${window.location.origin}/auth/callback` },
+    })
+
+    if (error) {
+      setLoading(false)
+      toast.error(`Đăng ký thất bại: ${error.message}`)
+      return
+    }
+
+    let user = data.user
+    let session = data.session
+
+    if (!session) {
+      const signedIn = await supabase.auth.signInWithPassword({ email: form.email, password: form.password })
+      if (signedIn.error) {
+        setLoading(false)
+        toast.error("Tài khoản đã tạo nhưng chưa đăng nhập được. Tắt Confirm email trong Supabase Auth rồi thử lại.")
+        return
+      }
+      user = signedIn.data.user
+      session = signedIn.data.session
+    }
+
+    await syncUser(user)
     setLoading(false)
-    if (error) { toast.error(`Đăng ký thất bại: ${error.message}`); return }
-    toast.success("Đăng ký thành công. Kiểm tra email để xác nhận tài khoản.")
+    toast.success("Đăng ký thành công")
+    router.push("/")
+    router.refresh()
   }
 
   const signupWithGoogle = async () => {

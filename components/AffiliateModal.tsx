@@ -1,6 +1,5 @@
 "use client"
 
-import { X } from "lucide-react"
 import { useEffect, useState } from "react"
 
 interface AffiliateModalProps {
@@ -73,27 +72,12 @@ export function AffiliateModal({ isOpen, onClose, onUnlock, storyId }: Affiliate
     }
   }
 
-  useEffect(() => {
-    if (!isOpen) return
-    const handleEsc = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose()
-    }
-    window.addEventListener("keydown", handleEsc)
-    return () => window.removeEventListener("keydown", handleEsc)
-  }, [isOpen, onClose])
-
   if (!isOpen) return null
 
   return (
     <div data-affiliate-modal className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-      <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl">
+      <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
         <div className="relative p-6 pb-4">
-          <button
-            onClick={onClose}
-            className="absolute right-4 top-4 text-gray-400 transition-colors hover:text-gray-600"
-          >
-            <X className="h-5 w-5" />
-          </button>
           <h2 className="text-center text-2xl font-bold text-gray-900">Mời bạn mở khóa audio</h2>
         </div>
 

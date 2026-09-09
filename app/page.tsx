@@ -15,7 +15,6 @@ import { slugify } from "@/lib/slug"
 import { randomActiveListeners, updateActiveListeners, randomSocialProofDelay } from "@/lib/social-proof"
 
 
-
 function viewsFor(story: Story) {
   const real = Number(story.real_views || 0)
   const fake = Number(story.base_fake_views || story.plays || 0)
@@ -61,6 +60,7 @@ export default function Page() {
   const [selectedGenres, setSelectedGenres] = useState<string[]>(["Tất cả"])
   const [genreExpanded, setGenreExpanded] = useState(false)
   const [categoryOptions, setCategoryOptions] = useState<CategoryOption[]>([])
+  const [showSuggestions, setShowSuggestions] = useState(false)
   const pageSize = 6
 
   useEffect(() => {
@@ -136,15 +136,16 @@ export default function Page() {
   }, [])
 
   const filteredStories = useMemo(() => stories.filter((story) => {
-    const query = submittedSearch.trim().toLowerCase()
-    const matchesSearch = !query || [story.title, story.genre, story.description].some((value) => value?.toLowerCase().includes(query))
+    const query = (submittedSearch || searchTerm).trim().toLowerCase()
+    const haystack = [story.title, story.author, story.genre, story.description].join(" ").toLowerCase()
+    const matchesSearch = !query || haystack.includes(query)
     const matchesGenre = selectedGenres.includes("Tất cả") || selectedGenres.some((genre) => genresFor(story.genre).includes(genre))
     return matchesSearch && matchesGenre
-  }), [stories, submittedSearch, selectedGenres])
+  }), [stories, searchTerm, submittedSearch, selectedGenres])
   const suggestions = useMemo(() => {
     const query = searchTerm.trim().toLowerCase()
     if (!query) return []
-    return stories.filter((story) => [story.title, story.genre, story.description].some((value) => value?.toLowerCase().includes(query))).slice(0, 5)
+    return stories.filter((story) => [story.title, story.author, story.genre, story.description].join(" ").toLowerCase().includes(query)).slice(0, 8)
   }, [stories, searchTerm])
   const totalPages = Math.max(1, Math.ceil(filteredStories.length / pageSize))
   const pageStories = filteredStories.slice((currentPage - 1) * pageSize, currentPage * pageSize)
@@ -153,14 +154,22 @@ export default function Page() {
 
   const handleSearchInput = (value: string) => {
     setSearchTerm(value)
-    if (!value.trim()) setSubmittedSearch("")
+    setShowSuggestions(true)
+    if (!value.trim()) {
+      setSubmittedSearch("")
+      setShowSuggestions(false)
+    }
   }
   const submitSearch = (event: React.KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === "Enter") setSubmittedSearch(searchTerm.trim())
+    if (event.key === "Enter") {
+      setSubmittedSearch(searchTerm.trim())
+      setShowSuggestions(false)
+    }
   }
   const chooseSuggestion = (story: Story) => {
     setSearchTerm(story.title)
     setSubmittedSearch(story.title)
+    setShowSuggestions(false)
   }
   const toggleGenre = (genre: string) => {
     if (genre === "Tất cả") return setSelectedGenres(["Tất cả"])
@@ -171,22 +180,45 @@ export default function Page() {
   }
   const storyUrl = (story: Story) => `/track/${story.slug || story.id}`
   const genreBadges = (genre: string | null | undefined) => <div className="flex flex-wrap gap-1">{genresFor(genre).map((item) => <Badge key={item} variant="outline" className={`text-xs ${homeGenreClass}`}>{item}</Badge>)}</div>
-  const visibleCategories = categoryOptions.filter((category) => category.visible)
+  const visibleCategories = useMemo(() => {
+    const fromStories = [...new Set(stories.flatMap((story) => genresFor(story.genre)))]
+    const fromAdmin = categoryOptions.filter((category) => category.visible).map((category) => category.name)
+    const names = [...new Set([...fromAdmin, ...fromStories])].filter(Boolean)
+    return names.map((name, index) => ({ id: name || index, name, visible: true }))
+  }, [categoryOptions, stories])
 
   return <div className="min-h-screen bg-background">
-    <Header value={searchTerm} onChange={handleSearchInput} onKeyDown={submitSearch} suggestions={suggestions} onSuggestion={chooseSuggestion} />
+    <Header
+      value={searchTerm}
+      onChange={handleSearchInput}
+      onKeyDown={submitSearch}
+      suggestions={showSuggestions ? suggestions : []}
+      onSuggestion={chooseSuggestion}
+    />
     <main className="w-full min-h-screen px-4 py-8 md:px-8 lg:px-12">
-      <div className="mb-8"><h1 className="text-3xl font-bold tracking-tight">Danh sách audio <Badge variant="secondary">{loading ? "Đang tải..." : `${filteredStories.length} truyện`}</Badge></h1></div>
+      <div className="mb-8"><h1 className="text-3xl font-bold tracking-tight">Danh sách audio <Badge className="ml-2 border-transparent bg-[#EE4D2D] text-[14px] font-bold text-white hover:bg-[#EE4D2D]">{loading ? "Đang tải..." : `${filteredStories.length} truyện`}</Badge></h1></div>
       <div className="mb-10 flex flex-wrap items-start gap-3">
         <span className="pt-2 text-sm font-medium">Thể loại:</span>
         <div className="flex flex-wrap gap-2">
-          <label className="flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1 text-sm"><input type="checkbox" checked={selectedGenres.includes("Tất cả")} onChange={() => toggleGenre("Tất cả")} />Tất cả</label>
-          {genreExpanded && visibleCategories.map((category) => <label key={category.id} className="flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1 text-sm"><input type="checkbox" checked={selectedGenres.includes(category.name)} onChange={() => toggleGenre(category.name)} />{category.name}</label>)}
+          <label className="flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1 text-sm">
+            <input type="checkbox" checked={selectedGenres.includes("Tất cả")} onChange={() => toggleGenre("Tất cả")} />
+            Tất cả
+          </label>
+          {(genreExpanded ? visibleCategories : visibleCategories.slice(0, 5)).map((category) => (
+            <label key={category.id} className="flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1 text-sm">
+              <input type="checkbox" checked={selectedGenres.includes(category.name)} onChange={() => toggleGenre(category.name)} />
+              {category.name}
+            </label>
+          ))}
         </div>
-        <Button type="button" variant="outline" size="sm" onClick={() => setGenreExpanded((expanded) => !expanded)}>{genreExpanded ? "Thu gọn" : "Chọn thể loại"}</Button>
+        {visibleCategories.length > 5 && (
+          <Button type="button" variant="outline" size="sm" onClick={() => setGenreExpanded((expanded) => !expanded)}>
+            {genreExpanded ? "Thu gọn" : "Xem thêm"}
+          </Button>
+        )}
       </div>
-      <section className="mb-12"><h2 className="mb-6 text-2xl font-semibold">Được nghe nhiều</h2><div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">{loading ? <p>Đang tải truyện...</p> : filteredStories.slice(0, 4).map((story, index) => <Link key={story.id} href={storyUrl(story)} className="block rounded-xl border bg-card p-5 shadow-sm hover:border-primary"><div className="flex flex-col gap-3"><div className="flex items-center gap-3"><span className="text-6xl font-bold text-[#EE4D2D]">{index + 1}</span><span className="flex h-10 w-10 items-center justify-center rounded border"><Play className="h-5 w-5" /></span>{genreBadges(story.genre)}</div><h3 className="text-[22px] font-bold">{story.title}</h3><p className={`line-clamp-2 text-justify ${homeDescriptionClass}`}>{story.description}</p><div className={`grid grid-cols-3 gap-3 text-sm ${homeMetricClass}`}><div><div>Lượt nghe</div><div className="mt-1 font-medium">{viewsFor(story).toLocaleString()}</div></div><div><div>Đang nghe</div><div className="mt-1 flex items-center gap-1 font-medium text-green-600"><span className="h-2 w-2 animate-pulse rounded-full bg-[#EE4D2D]" /><span className="text-[#EE4D2D]">{storyActiveListeners(activeListenersMap, story.id)}</span></div></div><div><div>Thời lượng</div><div className="mt-1 font-medium">{story.duration || "--"}</div></div></div></div></Link>)}</div></section>
-      <div id="audio-list" className="space-y-2">{pageStories.map((story) => <Link key={story.id} href={storyUrl(story)} className="flex items-center gap-4 rounded-lg border bg-card p-4 transition-colors hover:bg-accent"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border"><Play className="h-5 w-5" /></span><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><h3 className="text-lg font-semibold">{story.title}</h3>{genreBadges(story.genre)}</div><p className={`line-clamp-2 text-sm ${homeDescriptionClass}`}>{story.description || "Chưa có mô tả cho truyện này."}</p><div className={`mt-2 text-xs ${homeMetricClass}`}>{story.author || "Chưa rõ tác giả"} • {story.episodes || 0} tập • {viewsFor(story).toLocaleString()} lượt nghe • <span className="text-green-600"><span className="mr-1 inline-block h-2 w-2 animate-pulse rounded-full bg-[#EE4D2D]" /><span className="text-[#EE4D2D]">{storyActiveListeners(activeListenersMap, story.id)} đang nghe</span></span> • Thời lượng: {story.duration || "--"}</div></div><span className="shrink-0 text-sm text-muted-foreground">{story.duration || "--"}</span></Link>)}</div>
+      <section className="mb-12"><h2 className="mb-6 text-2xl font-semibold">Được nghe nhiều</h2><div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">{loading ? <p>Đang tải truyện...</p> : filteredStories.slice(0, 4).map((story, index) => <Link key={story.id} href={storyUrl(story)} className="block rounded-xl border bg-card p-5 shadow-sm hover:border-primary"><div className="flex flex-col gap-3"><div className="flex items-center gap-3"><span className="text-6xl font-bold text-[#EE4D2D]">{index + 1}</span><span className="flex h-10 w-10 items-center justify-center rounded border"><Play className="h-5 w-5" /></span>{genreBadges(story.genre)}</div><h3 className="text-[22px] font-bold">{story.title}</h3><p className={`line-clamp-2 text-justify ${homeDescriptionClass}`}>{story.description}</p><div className={`grid grid-cols-3 gap-3 text-sm ${homeMetricClass}`}><div><div>Lượt nghe</div><div className="mt-1 text-[14px] font-bold">{viewsFor(story).toLocaleString()}</div></div><div><div>Đang nghe</div><div className="mt-1 flex items-center gap-1 font-bold text-green-600"><span className="h-2 w-2 animate-pulse rounded-full bg-[#EE4D2D]" /><span className="text-[14px] font-bold text-[#EE4D2D]">{storyActiveListeners(activeListenersMap, story.id)}</span></div></div><div><div>Thời lượng</div><div className="mt-1 text-[14px] font-bold">{story.duration || "--"}</div></div></div></div></Link>)}</div></section>
+      <div id="audio-list" className="space-y-2">{pageStories.map((story) => <Link key={story.id} href={storyUrl(story)} className="flex items-center gap-4 rounded-lg border bg-card p-4 transition-colors hover:bg-accent"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border"><Play className="h-5 w-5" /></span><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><h3 className="text-lg font-semibold">{story.title}</h3>{genreBadges(story.genre)}</div><p className={`line-clamp-2 text-sm ${homeDescriptionClass}`}>{story.description || "Chưa có mô tả cho truyện này."}</p><div className={`mt-2 text-[14px] ${homeMetricClass}`}>{story.author || "Chưa rõ tác giả"} • {story.episodes || 0} tập • <span className="font-bold">{viewsFor(story).toLocaleString()}</span> lượt nghe • <span className="text-green-600"><span className="mr-1 inline-block h-2 w-2 animate-pulse rounded-full bg-[#EE4D2D]" /><span className="font-bold text-[#EE4D2D]">{storyActiveListeners(activeListenersMap, story.id)} đang nghe</span></span> • Thời lượng: <span className="font-bold">{story.duration || "--"}</span></div></div><span className="shrink-0 text-[14px] font-bold text-muted-foreground">{story.duration || "--"}</span></Link>)}</div>
       <div className="mt-12 flex justify-center gap-3"><Button variant="outline" disabled={currentPage === 1} onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}>Trước</Button><span className="flex items-center">{currentPage} / {totalPages}</span><Button variant="outline" disabled={currentPage === totalPages} onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}>Sau</Button></div>
     </main>
     <Footer />

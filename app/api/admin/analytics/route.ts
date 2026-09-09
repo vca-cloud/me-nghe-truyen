@@ -39,7 +39,7 @@ export async function GET(request: Request) {
     const db = createClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } })
     let storiesQuery = db.from("stories").select("*").order("id", { ascending: true })
     let episodesQuery = db.from("episodes").select("id", { count: "exact", head: true })
-    let membersQuery = db.from("admin_users").select("id", { count: "exact", head: true })
+    let membersQuery = db.from("admin_users").select("auth_id", { count: "exact", head: true })
     let linksQuery = db.from("affiliate_links").select("*").order("clicks", { ascending: false })
 
     if (from) {
