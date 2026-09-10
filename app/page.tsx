@@ -7,10 +7,10 @@ import { Button } from "@/components/ui/button"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { Play } from "lucide-react"
-import { supabase, type Episode } from "@/lib/supabase"
+import { supabase } from "@/lib/supabase"
 import { toast } from "sonner"
 import { getCategoryOptions, type CategoryOption } from "@/lib/category-options"
-import { formatEpisodeDuration, sumDurationSeconds } from "@/lib/duration"
+// formatEpisodeDuration và sumDurationSeconds không còn dùng trên trang chủ
 import { slugify } from "@/lib/slug"
 import { randomActiveListeners, updateActiveListeners, randomSocialProofDelay } from "@/lib/social-proof"
 
@@ -93,9 +93,12 @@ export default function Page() {
   useEffect(() => {
     async function fetchStories() {
       try {
-        const { data, error } = await supabase.from("stories").select("*").order("id", { ascending: false })
+        const { data, error } = await supabase
+          .from("stories")
+          .select("id, title, author, genre, description, audio_url, cover_url, episodes, duration, plays, real_views, base_fake_views, status")
+          .order("id", { ascending: false })
         if (error) throw error
-        const rows = ((data || []) as Array<Record<string, unknown>>).map((story) => ({
+        const normalizedStories = ((data || []) as Array<Record<string, unknown>>).map((story) => ({
           id: Number(story.id),
           title: String(story.title || ""),
           author: String(story.author || ""),
@@ -109,19 +112,8 @@ export default function Page() {
           real_views: Number(story.real_views ?? story.plays ?? 0),
           base_fake_views: Number(story.base_fake_views ?? story.plays ?? 0),
           status: String(story.status || "Đang cập nhật"),
-          slug: String(story.slug || slugify(String(story.title || "")) || story.id),
+          slug: slugify(String(story.title || "")) || String(story.id),
         }))
-        const storyIds = rows.map((story) => story.id)
-        const { data: episodeData, error: episodeError } = storyIds.length
-          ? await supabase.from("episodes").select("story_id, duration").in("story_id", storyIds)
-          : { data: [], error: null }
-        if (episodeError) console.warn("Không tải được thời lượng tập:", episodeError.message)
-        const byStory = new Map<number, Episode[]>()
-        for (const episode of (episodeData || []) as Episode[]) byStory.set(Number(episode.story_id), [...(byStory.get(Number(episode.story_id)) || []), episode])
-        const normalizedStories = rows.map((story) => {
-          const items = byStory.get(Number(story.id)) || []
-          return { ...story, episodes: items.length || story.episodes, duration: items.length ? formatEpisodeDuration(sumDurationSeconds(items.map((episode) => episode.duration))) : (story.duration || "--") }
-        })
         setStories(normalizedStories)
         setActiveListenersMap((current) => {
           const next = new Map<number, number>()
