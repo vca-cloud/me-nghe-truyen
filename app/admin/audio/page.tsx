@@ -119,19 +119,13 @@ export default function AudioPage() {
     if (!window.confirm(`Bạn có chắc muốn xóa truyện "${audio.title}" và toàn bộ tập audio không?`)) return
 
     try {
-      const { error: episodesError } = await supabase
-        .from("episodes")
-        .delete()
-        .eq("story_id", audio.id)
-
-      if (episodesError) throw episodesError
-
-      const { error: storyError } = await supabase
-        .from("stories")
-        .delete()
-        .eq("id", audio.id)
-
-      if (storyError) throw storyError
+      const response = await fetch("/api/admin/stories", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: audio.id }),
+      })
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(payload?.error || "Không thể xóa truyện.")
 
       toast.success("Đã xóa truyện và toàn bộ tập audio.")
       await fetchAudios()
