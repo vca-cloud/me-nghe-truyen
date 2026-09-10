@@ -93,12 +93,10 @@ export default function Page() {
   useEffect(() => {
     async function fetchStories() {
       try {
-        const { data, error } = await supabase
-          .from("stories")
-          .select("id, title, author, genre, description, audio_url, cover_url, episodes, duration, plays, real_views, base_fake_views, status")
-          .order("id", { ascending: false })
-        if (error) throw error
-        const normalizedStories = ((data || []) as Array<Record<string, unknown>>).map((story) => ({
+        const response = await fetch("/api/home-stories", { cache: "no-store" })
+        const payload = await response.json()
+        if (!response.ok) throw new Error(payload?.error || "Không tải được dữ liệu")
+        const normalizedStories = ((payload.stories || []) as Array<Record<string, unknown>>).map((story) => ({
           id: Number(story.id),
           title: String(story.title || ""),
           author: String(story.author || ""),

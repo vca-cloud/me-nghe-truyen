@@ -85,13 +85,7 @@ export function ImportStoriesDialog({ onSuccess }: Props) {
             duration: story.episodes[0]?.duration || null,
           }
 
-          let { data, error } = await supabase.from("stories").insert([payload]).select("id")
-          if (error?.code === "PGRST204" && error.message.includes("slug")) {
-            const { slug: _slug, ...legacy } = payload
-            const result = await supabase.from("stories").insert([legacy]).select("id")
-            data = result.data
-            error = result.error
-          }
+          const { data, error } = await supabase.from("stories").insert([payload]).select("id")
           if (error) {
             skipped++
             errors.push({ line: index + 1, field: "title", message: error.message })
