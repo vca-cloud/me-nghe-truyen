@@ -58,7 +58,7 @@ export function TrackExperience({
   }
 
   const handleEnded = () => {
-    setIsUnlocked(false)
+    // Không reset unlock — giữ unlock cho session
     setPendingEpisode(null)
     setShowAffiliate(false)
   }
