@@ -93,10 +93,9 @@ export default function Page() {
   useEffect(() => {
     async function fetchStories() {
       try {
-        const response = await fetch("/api/admin/analytics", { cache: "no-store" })
-        const payload = await response.json()
-        if (!response.ok) throw new Error(payload?.error || "Không tải được dữ liệu truyện.")
-        const rows = ((payload.stories || []) as Array<Record<string, unknown>>).map((story) => ({
+        const { data, error } = await supabase.from("stories").select("*").order("id", { ascending: false })
+        if (error) throw error
+        const rows = ((data || []) as Array<Record<string, unknown>>).map((story) => ({
           id: Number(story.id),
           title: String(story.title || ""),
           author: String(story.author || ""),
@@ -107,18 +106,21 @@ export default function Page() {
           episodes: Number(story.episodes || 0),
           duration: String(story.duration || "--"),
           plays: String(story.plays || "0"),
-          real_views: Number(story.real_views ?? story.realViews ?? story.plays ?? 0),
-          base_fake_views: Number(story.base_fake_views ?? story.fakeViews ?? 0),
+          real_views: Number(story.real_views ?? story.plays ?? 0),
+          base_fake_views: Number(story.base_fake_views ?? story.plays ?? 0),
           status: String(story.status || "Đang cập nhật"),
-          slug: slugify(String(story.title || "")),
+          slug: String(story.slug || slugify(String(story.title || "")) || story.id),
         }))
-        const { data: episodeData, error: episodeError } = await supabase.from("episodes").select("story_id, duration").in("story_id", rows.map((story) => story.id))
+        const storyIds = rows.map((story) => story.id)
+        const { data: episodeData, error: episodeError } = storyIds.length
+          ? await supabase.from("episodes").select("story_id, duration").in("story_id", storyIds)
+          : { data: [], error: null }
         if (episodeError) console.warn("Không tải được thời lượng tập:", episodeError.message)
         const byStory = new Map<number, Episode[]>()
         for (const episode of (episodeData || []) as Episode[]) byStory.set(Number(episode.story_id), [...(byStory.get(Number(episode.story_id)) || []), episode])
         const normalizedStories = rows.map((story) => {
           const items = byStory.get(Number(story.id)) || []
-          return { ...story, slug: slugify(story.title), episodes: items.length || story.episodes, duration: items.length ? formatEpisodeDuration(sumDurationSeconds(items.map((episode) => episode.duration))) : (story.duration || "--") }
+          return { ...story, episodes: items.length || story.episodes, duration: items.length ? formatEpisodeDuration(sumDurationSeconds(items.map((episode) => episode.duration))) : (story.duration || "--") }
         })
         setStories(normalizedStories)
         setActiveListenersMap((current) => {
@@ -131,8 +133,14 @@ export default function Page() {
         toast.error(`Lỗi: ${error instanceof Error ? error.message : "Không tải được dữ liệu."}`)
       } finally { setLoading(false) }
     }
-    void fetchStories()
+    const reload = () => { void fetchStories() }
+    reload()
     void getCategoryOptions().then(setCategoryOptions)
+    window.addEventListener("focus", reload)
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") reload()
+    })
+    return () => window.removeEventListener("focus", reload)
   }, [])
 
   const filteredStories = useMemo(() => stories.filter((story) => {

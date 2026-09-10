@@ -28,6 +28,8 @@ export async function DELETE(request: Request) {
     auth: { autoRefreshToken: false, persistSession: false },
   })
 
+  await db.from("listener_logs").delete().eq("story_id", storyId)
+
   const { error: episodesError } = await db.from("episodes").delete().eq("story_id", storyId)
   if (episodesError) {
     return NextResponse.json({ error: episodesError.message }, { status: 500 })
