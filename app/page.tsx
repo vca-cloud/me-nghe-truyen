@@ -110,11 +110,6 @@ export default function Page() {
             status: String(story.status || "Đang cập nhật"),
             slug: slugify(String(story.title || "")) || String(story.id),
           }))
-          .sort((a, b) => {
-            const totalA = a.real_views + a.base_fake_views
-            const totalB = b.real_views + b.base_fake_views
-            return totalB - totalA
-          })
         setStories(normalizedStories)
         setActiveListenersMap((current) => {
           const next = new Map<number, number>()
