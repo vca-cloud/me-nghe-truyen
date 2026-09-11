@@ -78,6 +78,7 @@ export function ImportStoriesDialog({ onSuccess }: Props) {
             genre: story.genre,
             description: story.description,
             cover_url: story.cover_url || null,
+            text_url: story.text_url || null,
             status: story.status,
             plays: "0",
             audio_url: story.episodes[0]?.audio_url || null,

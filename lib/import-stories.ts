@@ -4,6 +4,7 @@ export interface ParsedStory {
   genre: string
   description: string
   cover_url?: string
+  text_url?: string
   status: string
   episodes: Array<{
     episode_number: number
@@ -164,6 +165,7 @@ function parseNestedJSON(data: unknown[], errors: ParseError[]): ParseResult {
       genre: String(obj.genre || "").trim(),
       description: String(obj.description || "").trim(),
       cover_url: String(obj.cover_url || "").trim() || undefined,
+      text_url: String(obj.text_url || "").trim() || undefined,
       status: String(obj.status || "").trim() || "Đang cập nhật",
       episodes,
     })
@@ -217,6 +219,7 @@ function groupRowsIntoStories(rows: Array<Record<string, unknown>>, errors: Pars
       genre: String(firstRow.genre || "").trim(),
       description: String(firstRow.description || "").trim(),
       cover_url: String(firstRow.cover_url || "").trim() || undefined,
+      text_url: String(firstRow.text_url || "").trim() || undefined,
       status: String(firstRow.status || "").trim() || "Đang cập nhật",
       episodes,
     })
