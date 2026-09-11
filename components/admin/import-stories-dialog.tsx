@@ -190,6 +190,14 @@ export function ImportStoriesDialog({ onSuccess }: Props) {
               <p>Thêm mới: {results.success}</p>
               <p>Bỏ qua vì đã có: {results.skipped}</p>
               <p>Lỗi: {results.errors.length}</p>
+              {results.errors.length > 0 && (
+                <div className="mt-2 max-h-32 overflow-y-auto rounded bg-red-50 p-2 text-xs text-red-700">
+                  {results.errors.slice(0, 10).map((err, idx) => (
+                    <div key={idx}>Dòng {err.line}: {err.message}</div>
+                  ))}
+                  {results.errors.length > 10 && <div className="mt-1 font-medium">...và {results.errors.length - 10} lỗi khác</div>}
+                </div>
+              )}
             </div>
           )}
           <div className="flex gap-3 border-t pt-4">
