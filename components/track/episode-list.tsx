@@ -38,7 +38,7 @@ export function EpisodeList({ episodes, selectedEpisode, onSelect, status }: Epi
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="font-medium truncate">Tập {episode.episode_number}</div>
-                  <div className="text-sm text-muted-foreground truncate">{episode.title}</div>
+                  <div className="truncate text-sm font-medium" style={{ color: "#154B95" }}>{episode.title}</div>
                 </div>
                 <div className="flex-shrink-0">
                   {status === "locked" ? (

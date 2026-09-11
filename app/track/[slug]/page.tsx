@@ -18,6 +18,7 @@ import { TrackExperience } from "@/components/track/track-experience"
 import { ImageWithFallback } from "@/components/image-with-fallback"
 import { getEpisodes, supabase } from "@/lib/supabase"
 import { slugify } from "@/lib/slug"
+import { totalViewsFor } from "@/lib/story-views"
 
 interface Story {
   id: number
@@ -31,6 +32,8 @@ interface Story {
   episodes: number | null
   duration: string | null
   plays: string | null
+  real_views?: number | null
+  base_fake_views?: number | null
   status: string | null
 }
 
@@ -96,7 +99,7 @@ export default async function TrackPage({ params }: { params: Promise<{ slug?: s
         <div className="grid w-full grid-cols-1 gap-8 lg:grid-cols-[minmax(280px,360px)_minmax(0,1fr)] lg:gap-10">
           <aside className="flex min-h-0 flex-col gap-8">
             <section className="flex flex-col gap-4">
-              <Badge className="w-fit">{story.plays || "0"} lượt nghe</Badge>
+              <Badge className="w-fit">{totalViewsFor(story).toLocaleString()} lượt nghe</Badge>
               <div className="aspect-square w-full overflow-hidden rounded-xl border">
                 {story.cover_url ? (
                   <ImageWithFallback src={story.cover_url} alt={story.title} className="h-full w-full object-cover" />
@@ -119,6 +122,7 @@ export default async function TrackPage({ params }: { params: Promise<{ slug?: s
                   </div>
                 )}
               </div>
+              <Button className="w-full" variant="outline" nativeButton={false} render={<a href="https://yeudoiaudio.com" target="_blank" rel="noopener noreferrer" />}>Đọc truyện chữ</Button>
               <p className="text-justify text-sm leading-6 text-muted-foreground">{story.description || "Chưa có mô tả."}</p>
               <div className="flex flex-wrap gap-2">
                 <Button className="flex-1" nativeButton={false} render={<a href="#audio-player" />}>Nghe tiếp</Button>
