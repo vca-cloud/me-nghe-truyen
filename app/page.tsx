@@ -93,22 +93,28 @@ export default function Page() {
         const response = await fetch("/api/home-stories", { cache: "no-store" })
         const payload = await response.json()
         if (!response.ok) throw new Error(payload?.error || "Không tải được dữ liệu")
-        const normalizedStories = ((payload.stories || []) as Array<Record<string, unknown>>).map((story) => ({
-          id: Number(story.id),
-          title: String(story.title || ""),
-          author: String(story.author || ""),
-          genre: String(story.genre || ""),
-          description: String(story.description || ""),
-          audio_url: String(story.audio_url || ""),
-          cover_url: story.cover_url ? String(story.cover_url) : null,
-          episodes: Number(story.episodes || 0),
-          duration: formatClockDuration(String(story.duration || "")),
-          plays: String(story.plays || "0"),
-          real_views: Number(story.real_views ?? 0),
-          base_fake_views: Number(story.base_fake_views ?? story.plays ?? 0),
-          status: String(story.status || "Đang cập nhật"),
-          slug: slugify(String(story.title || "")) || String(story.id),
-        }))
+        const normalizedStories = ((payload.stories || []) as Array<Record<string, unknown>>)
+          .map((story) => ({
+            id: Number(story.id),
+            title: String(story.title || ""),
+            author: String(story.author || ""),
+            genre: String(story.genre || ""),
+            description: String(story.description || ""),
+            audio_url: String(story.audio_url || ""),
+            cover_url: story.cover_url ? String(story.cover_url) : null,
+            episodes: Number(story.episodes || 0),
+            duration: formatClockDuration(String(story.duration || "")),
+            plays: String(story.plays || "0"),
+            real_views: Number(story.real_views ?? 0),
+            base_fake_views: Number(story.base_fake_views ?? story.plays ?? 0),
+            status: String(story.status || "Đang cập nhật"),
+            slug: slugify(String(story.title || "")) || String(story.id),
+          }))
+          .sort((a, b) => {
+            const totalA = a.real_views + a.base_fake_views
+            const totalB = b.real_views + b.base_fake_views
+            return totalB - totalA
+          })
         setStories(normalizedStories)
         setActiveListenersMap((current) => {
           const next = new Map<number, number>()

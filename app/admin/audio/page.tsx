@@ -41,10 +41,11 @@ export default function AudioPage() {
   const fetchAudios = async () => {
     setLoading(true)
     try {
-      const { data: stories, error } = await supabase
-        .from("stories")
-        .select("*")
-        .order("id", { ascending: false })
+    const { data: stories, error } = await supabase
+      .from("stories")
+      .select("*")
+      .order("base_fake_views", { descending: true })
+      .order("real_views", { descending: true })
 
       if (error) throw error
 
