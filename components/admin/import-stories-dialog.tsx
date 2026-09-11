@@ -11,6 +11,7 @@ import { toast } from "sonner"
 import { parseCSV, parseJSON, type ParseError, type ParsedStory } from "@/lib/import-stories"
 import { supabase } from "@/lib/supabase"
 import { slugify } from "@/lib/slug"
+import { formatClockDuration, parseDurationSeconds, sumDurationSeconds } from "@/lib/duration"
 
 interface Props { onSuccess: () => void }
 type Result = { success: number; updated: number; skipped: number; errors: ParseError[] }
@@ -70,6 +71,9 @@ export function ImportStoriesDialog({ onSuccess }: Props) {
       const story = stories[index]
       try {
         const keys = storyKeys(story.title)
+        const totalDurationSeconds = sumDurationSeconds(story.episodes.map((episode) => episode.duration))
+        const totalDuration = totalDurationSeconds > 0 ? formatClockDuration(totalDurationSeconds) : null
+        const initialFakeViews = Math.floor(1500 + Math.random() * 13501)
         const existing = keys.map((key) => existingByKey.get(key)).find(Boolean)
         const payload = {
           title: story.title,
@@ -81,7 +85,7 @@ export function ImportStoriesDialog({ onSuccess }: Props) {
           status: story.status,
           audio_url: story.episodes[0]?.audio_url || null,
           episodes: story.episodes.length,
-          duration: story.episodes[0]?.duration || null,
+          duration: totalDuration,
         }
 
         let storyId: number
@@ -91,7 +95,7 @@ export function ImportStoriesDialog({ onSuccess }: Props) {
           storyId = existing.id
           updated++
         } else {
-          const { data, error } = await supabase.from("stories").insert([{ ...payload, plays: "0" }]).select("id")
+          const { data, error } = await supabase.from("stories").insert([{ ...payload, plays: "0", base_fake_views: initialFakeViews, real_views: 0 }]).select("id")
           if (error) throw error
           storyId = Number(data?.[0]?.id)
           if (!storyId) throw new Error("Không lấy được ID truyện")
@@ -105,7 +109,7 @@ export function ImportStoriesDialog({ onSuccess }: Props) {
           episode_number: episode.episode_number || episodeIndex + 1,
           title: episode.title || `Tập ${episodeIndex + 1}`,
           audio_url: episode.audio_url,
-          duration: episode.duration || null,
+          duration: formatClockDuration(parseDurationSeconds(episode.duration)),
         }))
         const episodeResult = await supabase.from("episodes").insert(episodeRows)
         if (episodeResult.error) throw episodeResult.error
