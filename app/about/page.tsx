@@ -15,7 +15,7 @@ export default function AboutPage() {
       <main className="mx-auto w-full max-w-4xl px-4 py-10 md:px-8">
         <article className="space-y-10 text-foreground">
           <header className="space-y-4">
-            <h1 className="text-3xl font-bold tracking-tight text-[#EE4D2D]">MÊ NGHE TRUYỆN</h1>
+            <h1 className="text-4xl font-bold tracking-tight sm:text-5xl"><span className="text-[#EE4D2D]">mê</span> <span className="text-[#154B95]">nghe truyện</span></h1>
             <section className="space-y-3">
               <h2 className="text-2xl font-semibold">Tiện ích giải trí</h2>
               <ul className="list-disc space-y-2 pl-5 leading-7">
@@ -42,7 +42,7 @@ export default function AboutPage() {
           </p>
 
           <section className="space-y-4">
-            <h2 className="text-2xl font-semibold">ĐIỀU KHOẢN SỬ DỤNG</h2>
+            <h2 className="text-2xl font-semibold">Điều khoản sử dụng</h2>
             <p className="leading-7">Chào mừng bạn đến với Mê Nghe Truyện. Khi truy cập và trải nghiệm dịch vụ trên website, bạn đồng ý tuân thủ các quy định dưới đây:</p>
             <ul className="list-disc space-y-3 pl-5 leading-7">
               <li><strong>Quyền sử dụng:</strong> Website cung cấp nội dung audio miễn phí cho mục đích giải trí cá nhân. Nghiêm cấm mọi hành vi sao chép, thương mại hóa hoặc tự ý phân phối lại nội dung khi chưa có sự chấp thuận.</li>
@@ -55,7 +55,7 @@ export default function AboutPage() {
           </section>
 
           <section className="space-y-4">
-            <h2 className="text-2xl font-semibold">CHÍNH SÁCH BẢO MẬT</h2>
+            <h2 className="text-2xl font-semibold">Chính sách bảo mật</h2>
             <p className="leading-7">Mê Nghe Truyện cam kết tôn trọng và bảo vệ thông tin riêng tư của người dùng.</p>
             <ul className="list-disc space-y-3 pl-5 leading-7">
               <li><strong>Thu thập dữ liệu:</strong> Thông tin đăng ký gồm email và tên tài khoản khi bạn chủ động đăng ký. Dữ liệu tự động gồm địa chỉ IP, loại thiết bị, trình duyệt, lịch sử nghe và thao tác trên trang thông qua Cookie và công cụ đo lường.</li>
@@ -67,10 +67,9 @@ export default function AboutPage() {
           </section>
 
           <section className="space-y-4">
-            <h2 className="text-2xl font-semibold">MIỄN TRỪ TRÁCH NHIỆM &amp; BẢN QUYỀN</h2>
-            <h3 className="text-xl font-semibold">Miễn trừ trách nhiệm</h3>
+            <h2 className="text-2xl font-semibold">Miễn trừ trách nhiệm</h2>
             <p className="leading-7">Các nội dung nghe trên website chỉ mang tính chất giải trí. Chúng tôi có sử dụng A.I (có bản quyền thương mại) để hỗ trợ sáng tác, tạo dựng audio/video.</p>
-            <h3 className="text-xl font-semibold">Bảo vệ bản quyền (DMCA)</h3>
+            <h2 className="text-2xl font-semibold">Bảo vệ bản quyền (DMCA)</h2>
             <p className="leading-7">Chúng tôi tôn trọng quyền sở hữu trí tuệ của các tác giả và chủ sở hữu. Nhưng trong quá trình AI hỗ trợ sáng tạo, có thể vô tình trùng lặp ý tưởng. Nếu phát hiện bất kỳ nội dung nào trên Mê Nghe Truyện xâm phạm bản quyền của bạn, vui lòng gửi thông báo đến email của Mê Nghe Truyện ở bên dưới, kèm:</p>
             <ul className="list-disc space-y-3 pl-5 leading-7">
               <li>Thông tin liên lạc của chủ sở hữu hoặc đại diện hợp pháp.</li>
