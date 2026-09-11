@@ -18,13 +18,12 @@ interface ActiveAffiliateLink {
 
 export function AffiliateModal({ isOpen, onClose, onUnlock, storyId }: AffiliateModalProps) {
   const [link, setLink] = useState<ActiveAffiliateLink | null>(null)
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // Prefetch link ngay khi component mount (không đợi isOpen)
   useEffect(() => {
-    if (!isOpen) return
-
     const fetchActiveLink = async () => {
       setLoading(true)
       setError(null)
@@ -43,7 +42,7 @@ export function AffiliateModal({ isOpen, onClose, onUnlock, storyId }: Affiliate
     }
 
     void fetchActiveLink()
-  }, [isOpen])
+  }, [])
 
   const finishUnlock = () => {
     onUnlock()
