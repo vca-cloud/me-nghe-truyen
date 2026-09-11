@@ -44,8 +44,7 @@ export default function AudioPage() {
     const { data: stories, error } = await supabase
       .from("stories")
       .select("*")
-      .order("base_fake_views", { descending: true })
-      .order("real_views", { descending: true })
+      .order("id", { ascending: false })
 
       if (error) throw error
 

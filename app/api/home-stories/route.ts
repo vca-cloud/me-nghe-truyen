@@ -20,8 +20,7 @@ export async function GET() {
     const { data, error } = await db
       .from("stories")
       .select("*")
-      .order("base_fake_views", { descending: true })
-      .order("real_views", { descending: true })
+      .order("id", { ascending: false })
 
     if (error) {
       console.error("Supabase error:", error.message)
