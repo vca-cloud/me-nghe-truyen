@@ -72,7 +72,8 @@ export function AffiliateModal({ isOpen, onClose, onUnlock, storyId }: Affiliate
     }
   }
 
-  if (!isOpen) return null
+  // Không hiển thị lớp popup trung gian trong lúc lấy link; chỉ hiện modal Shopee khi đã có dữ liệu.
+  if (!isOpen || loading) return null
 
   return (
     <div data-affiliate-modal className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
