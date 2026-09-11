@@ -29,6 +29,7 @@ interface Story {
   description: string | null
   audio_url: string | null
   cover_url: string | null
+  text_url?: string | null
   episodes: number | null
   duration: string | null
   plays: string | null
@@ -68,6 +69,9 @@ export default async function TrackPage({ params }: { params: Promise<{ slug?: s
   }
 
   if (!story) notFound()
+
+  const textUrl = story.text_url?.trim() || `/track/${storyPath(story)}`
+  const isExternalTextUrl = /^https?:\/\//i.test(textUrl)
 
   const { data: allStories } = await supabase
     .from("stories")
@@ -122,7 +126,13 @@ export default async function TrackPage({ params }: { params: Promise<{ slug?: s
                   </div>
                 )}
               </div>
-              <Button className="w-full" variant="outline" nativeButton={false} render={<a href="https://yeudoiaudio.com" target="_blank" rel="noopener noreferrer" />}>Đọc truyện chữ</Button>
+              <Button
+                className="w-full"
+                nativeButton={false}
+                render={<a href={textUrl} {...(isExternalTextUrl ? { target: "_blank", rel: "noopener noreferrer" } : {})} />}
+              >
+                Đọc truyện chữ
+              </Button>
               <p className="text-justify text-sm leading-6 text-muted-foreground">{story.description || "Chưa có mô tả."}</p>
               <div className="flex flex-wrap gap-2">
                 <Button className="flex-1" nativeButton={false} render={<a href="#audio-player" />}>Nghe tiếp</Button>

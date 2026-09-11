@@ -28,6 +28,7 @@ export interface StoryFormValues {
   description?: string | null
   audio_url?: string | null
   cover_url?: string | null
+  text_url?: string | null
   status?: string | null
   plays?: string | null
   duration?: string | null
@@ -43,7 +44,7 @@ interface AudioFormDialogProps {
 
 const fallbackGenreNames: string[] = []
 const statuses = ["Đang cập nhật", "Hoàn thành"]
-const emptyForm = { title: "", author: "", genre: "", description: "", cover_url: "", status: "Đang cập nhật" }
+const emptyForm = { title: "", author: "", genre: "", description: "", cover_url: "", text_url: "", status: "Đang cập nhật" }
 const emptyEpisode = { episode_number: 1, title: "", audio_url: "", duration: "" }
 type EpisodeForm = typeof emptyEpisode
 
@@ -73,6 +74,7 @@ export function AudioFormDialog({ story = null, open: controlledOpen, onOpenChan
       genre: story?.genre ?? "",
       description: story?.description ?? "",
       cover_url: story?.cover_url ?? "",
+      text_url: story?.text_url ?? "",
       status: story?.status || "Đang cập nhật",
     })
     setEpisodeForms(story?.episodes?.length
@@ -151,6 +153,7 @@ export function AudioFormDialog({ story = null, open: controlledOpen, onOpenChan
       description: formData.description.trim(),
       audio_url: resolvedEpisodes[0].audio_url.trim(),
       cover_url: formData.cover_url.trim() || null,
+      text_url: formData.text_url.trim() || null,
       status: formData.status,
       episodes: resolvedEpisodes.length,
       duration: totalDuration === "--" ? null : totalDuration,
@@ -160,6 +163,10 @@ export function AudioFormDialog({ story = null, open: controlledOpen, onOpenChan
       const { data: storyData, error } = isEditing
         ? await supabase.from("stories").update(payload).eq("id", story!.id!).select()
         : await supabase.from("stories").insert([{ ...payload, plays: "0" }]).select()
+
+      if (error && /text_url/i.test(error.message)) {
+        toast.error("Chưa có cột text_url trên Supabase. Chạy SQL trong tab SQL Editor:\n\nALTER TABLE public.stories ADD COLUMN IF NOT EXISTS text_url TEXT;")
+      }
       if (error) throw error
       const storyId = isEditing ? story!.id! : storyData?.[0]?.id
       if (!storyId) throw new Error("Không lấy được ID bộ truyện.")
@@ -263,6 +270,15 @@ export function AudioFormDialog({ story = null, open: controlledOpen, onOpenChan
             </div>
           </div>
           <div className="space-y-2"><Label htmlFor="cover_url">Link Cover (tùy chọn)</Label><Input id="cover_url" value={formData.cover_url} onChange={(e) => setFormData((prev) => ({ ...prev, cover_url: e.target.value }))} placeholder="https://pub-xxx.r2.dev/cover.jpg" /></div>
+          <div className="space-y-2">
+            <Label htmlFor="text_url">Link truyện chữ (tùy chọn)</Label>
+            <Input
+              id="text_url"
+              value={formData.text_url}
+              onChange={(e) => setFormData((prev) => ({ ...prev, text_url: e.target.value }))}
+              placeholder="Để trống sẽ dẫn về trang audio của truyện này"
+            />
+          </div>
           <div className="flex justify-end gap-3 pt-4"><Button type="button" variant="outline" onClick={() => setOpen(false)}>Hủy</Button><Button type="submit" disabled={loading}>{loading ? "Đang lưu..." : isEditing ? "Cập nhật" : "Lưu truyện"}</Button></div>
         </form>
       </DialogContent>

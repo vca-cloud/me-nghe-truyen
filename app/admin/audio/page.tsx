@@ -23,6 +23,7 @@ interface Audio {
   description: string
   audio_url: string
   cover_url: string | null
+  text_url: string | null
   episodes: number
   duration: string
   plays: string
@@ -118,6 +119,7 @@ export default function AudioPage() {
       description: audio.description,
       audio_url: audio.audio_url,
       cover_url: audio.cover_url,
+      text_url: audio.text_url,
       status: audio.status,
       plays: audio.plays,
       duration: audio.duration,
