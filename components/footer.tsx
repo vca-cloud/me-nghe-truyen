@@ -5,21 +5,11 @@ export function Footer() {
     <footer className="border-t bg-background py-8 text-sm text-muted-foreground">
       <div className="container px-4 md:px-8">
         <div className="flex flex-col items-center gap-3 text-center">
-          <div className="flex flex-wrap items-center justify-center gap-2">
-            <Link href="/about" className="hover:text-foreground hover:underline">
-              Về chúng tôi
-            </Link>
-            <span>|</span>
-            <Link href="/privacy" className="hover:text-foreground hover:underline">
-              Chính sách bảo mật
-            </Link>
-            <span>|</span>
-            <Link href="/copyright" className="hover:text-foreground hover:underline">
-              Quyền tác giả
-            </Link>
-          </div>
+          <Link href="/about" className="hover:text-foreground hover:underline">
+            Read me
+          </Link>
           <div>
-            Email:{" "}
+            email: {" "}
             <a
               href="mailto:venturecreativeagency@gmail.com"
               className="hover:text-foreground hover:underline"
