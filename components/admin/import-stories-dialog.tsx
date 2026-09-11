@@ -13,7 +13,7 @@ import { supabase } from "@/lib/supabase"
 import { slugify } from "@/lib/slug"
 
 interface Props { onSuccess: () => void }
-type Result = { success: number; skipped: number; errors: ParseError[] }
+type Result = { success: number; updated: number; skipped: number; errors: ParseError[] }
 
 function normalizeTitle(value: string | null | undefined) {
   return String(value || "").trim().toLocaleLowerCase()
@@ -46,9 +46,10 @@ export function ImportStoriesDialog({ onSuccess }: Props) {
 
   const processImport = async (stories: ParsedStory[], parseErrors: ParseError[]) => {
     let success = 0
+    let updated = 0
     let skipped = 0
     const errors = [...parseErrors]
-    const existingKeys = new Set<string>()
+    const existingByKey = new Map<string, { id: number; title: string }>()
 
     const { data: existingStories, error: existingError } = await supabase
       .from("stories")
@@ -62,52 +63,54 @@ export function ImportStoriesDialog({ onSuccess }: Props) {
     }
 
     for (const row of existingStories || []) {
-      for (const key of storyKeys(String(row.title || ""))) existingKeys.add(key)
+      for (const key of storyKeys(String(row.title || ""))) existingByKey.set(key, { id: Number(row.id), title: String(row.title || "") })
     }
 
     for (let index = 0; index < stories.length; index++) {
       const story = stories[index]
       try {
         const keys = storyKeys(story.title)
-        if (keys.some((key) => existingKeys.has(key))) {
-          skipped++
-        } else {
-          const payload = {
-            title: story.title,
-            author: story.author,
-            genre: story.genre,
-            description: story.description,
-            cover_url: story.cover_url || null,
-            ...(story.text_url ? { text_url: story.text_url } : {}),
-            status: story.status,
-            plays: "0",
-            audio_url: story.episodes[0]?.audio_url || null,
-            episodes: story.episodes.length,
-            duration: story.episodes[0]?.duration || null,
-          }
-
-          const { data, error } = await supabase.from("stories").insert([payload]).select("id")
-          if (error) {
-            skipped++
-            errors.push({ line: index + 1, field: "title", message: error.message })
-          } else {
-            const storyId = data?.[0]?.id
-            if (!storyId) throw new Error("Không lấy được ID truyện")
-
-            const episodeRows = story.episodes.map((episode, episodeIndex) => ({
-              story_id: storyId,
-              episode_number: episode.episode_number || episodeIndex + 1,
-              title: episode.title || `Tập ${episodeIndex + 1}`,
-              audio_url: episode.audio_url,
-              duration: episode.duration || null,
-            }))
-            const episodeResult = await supabase.from("episodes").insert(episodeRows)
-            if (episodeResult.error) throw episodeResult.error
-
-            for (const key of keys) existingKeys.add(key)
-            success++
-          }
+        const existing = keys.map((key) => existingByKey.get(key)).find(Boolean)
+        const payload = {
+          title: story.title,
+          author: story.author,
+          genre: story.genre,
+          description: story.description,
+          cover_url: story.cover_url || null,
+          ...(story.text_url ? { text_url: story.text_url } : {}),
+          status: story.status,
+          audio_url: story.episodes[0]?.audio_url || null,
+          episodes: story.episodes.length,
+          duration: story.episodes[0]?.duration || null,
         }
+
+        let storyId: number
+        if (existing) {
+          const { error } = await supabase.from("stories").update(payload).eq("id", existing.id)
+          if (error) throw error
+          storyId = existing.id
+          updated++
+        } else {
+          const { data, error } = await supabase.from("stories").insert([{ ...payload, plays: "0" }]).select("id")
+          if (error) throw error
+          storyId = Number(data?.[0]?.id)
+          if (!storyId) throw new Error("Không lấy được ID truyện")
+          success++
+        }
+
+        const { error: deleteError } = await supabase.from("episodes").delete().eq("story_id", storyId)
+        if (deleteError) throw deleteError
+        const episodeRows = story.episodes.map((episode, episodeIndex) => ({
+          story_id: storyId,
+          episode_number: episode.episode_number || episodeIndex + 1,
+          title: episode.title || `Tập ${episodeIndex + 1}`,
+          audio_url: episode.audio_url,
+          duration: episode.duration || null,
+        }))
+        const episodeResult = await supabase.from("episodes").insert(episodeRows)
+        if (episodeResult.error) throw episodeResult.error
+
+        for (const key of keys) existingByKey.set(key, { id: storyId, title: story.title })
       } catch (error) {
         errors.push({ line: index + 1, field: "import", message: error instanceof Error ? error.message : "Lỗi import" })
       }
@@ -115,11 +118,11 @@ export function ImportStoriesDialog({ onSuccess }: Props) {
       setProgress(done / stories.length * 100)
       setProgressText(`Đã xử lý ${done}/${stories.length} truyện...`)
     }
-    setResults({ success, skipped, errors }); setLoading(false); setProgress(100)
-    setProgressText(`Xong! ${success} thêm mới, ${skipped} bỏ qua vì đã có`)
-    if (success) onSuccess()
+    setResults({ success, updated, skipped, errors }); setLoading(false); setProgress(100)
+    setProgressText(`Xong! ${success} thêm mới, ${updated} cập nhật`)
+    if (success || updated) onSuccess()
     if (errors.length) toast.error(`Có ${errors.length} lỗi trong quá trình import`)
-    else toast.success(`Import xong: ${success} truyện mới, ${skipped} truyện đã có nên bỏ qua`)
+    else toast.success(`Import xong: ${success} truyện mới, ${updated} truyện đã cập nhật`)
   }
 
   const handleImport = async () => {
@@ -157,7 +160,7 @@ export function ImportStoriesDialog({ onSuccess }: Props) {
         <DialogHeader>
           <DialogTitle>Import Truyện &amp; Tập Hàng Loạt</DialogTitle>
           <DialogDescription>
-            Import từ CSV hoặc JSON. Mỗi dòng CSV là một tập. Truyện đã có (trùng tên hoặc slug) sẽ bị bỏ qua, không thêm bản mới.
+            Import từ CSV hoặc JSON. Mỗi dòng CSV là một tập. Truyện mới sẽ được thêm; truyện trùng tên hoặc slug sẽ được cập nhật thông tin và danh sách tập.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-5 py-4">
@@ -188,7 +191,8 @@ export function ImportStoriesDialog({ onSuccess }: Props) {
             <div className="rounded-md border border-green-200 bg-green-50 p-4 text-sm">
               <p className="font-medium">Kết quả import</p>
               <p>Thêm mới: {results.success}</p>
-              <p>Bỏ qua vì đã có: {results.skipped}</p>
+              <p>Đã cập nhật: {results.updated}</p>
+              <p>Bỏ qua: {results.skipped}</p>
               <p>Lỗi: {results.errors.length}</p>
               {results.errors.length > 0 && (
                 <div className="mt-2 max-h-32 overflow-y-auto rounded bg-red-50 p-2 text-xs text-red-700">
