@@ -14,8 +14,11 @@ Mục tiêu hiện tại là vận hành nền tảng nghe truyện với dữ l
 - Trang chi tiết phát audio thật, chọn tập, khóa nội dung bằng modal affiliate Shopee trước khi nghe.
 - Người dùng đăng nhập bằng email/mật khẩu hoặc Google OAuth (Supabase Auth).
 - Admin quản lý truyện, tập, thể loại, thành viên, quản trị viên, affiliate Shopee, analytics và cài đặt.
-- Social proof: lượt nghe = lượt thật (`real_views`) + lượt ảo (`base_fake_views` / `plays`); số người đang nghe random riêng từng truyện, dao động nhẹ mỗi 5–10 giây trong khoảng 15–85.
+- Lượt nghe hiển thị thống nhất: lượt thực (`real_views`) + lượt ảo (`base_fake_views`); `real_views` được khởi tạo/đồng bộ từ `plays`, sau đó tăng khi người dùng mở khóa audio. `plays` chỉ là dữ liệu legacy, không được cộng thêm lần nữa.
+- Khu “Được nghe nhiều” xếp hạng giảm dần theo tổng lượt nghe; số thứ tự 1 là truyện có tổng cao nhất.
+- Số người đang nghe là social proof riêng từng truyện, dao động nhẹ trong khoảng 15–85 và lưu ở trình duyệt.
 - Giao diện light/dark theo palette thương hiệu; chữ trên card sáng (nền mint) luôn dùng `#154B95` để đủ tương phản.
+- Thời lượng ở trang chủ và Admin Audio lấy từ `stories.duration`, hiển thị thống nhất dạng `HH:MM:SS`.
 
 ## Công nghệ
 
