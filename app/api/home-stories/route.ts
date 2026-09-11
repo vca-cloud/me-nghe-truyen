@@ -19,7 +19,7 @@ export async function GET() {
 
     const { data, error } = await db
       .from("stories")
-      .select("id, title, author, genre, description, audio_url, cover_url, episodes, duration, plays, status")
+      .select("*")
       .order("id", { ascending: false })
 
     if (error) {
@@ -27,7 +27,13 @@ export async function GET() {
       throw error
     }
 
-    return NextResponse.json({ stories: data || [] })
+    const stories = (data || []).map((story) => ({
+      ...story,
+      real_views: Number(story.real_views ?? 0),
+      base_fake_views: Number(story.base_fake_views ?? story.plays ?? 0),
+    }))
+
+    return NextResponse.json({ stories })
   } catch (error) {
     console.error("Home-stories error:", error instanceof Error ? error.message : error)
     return NextResponse.json(

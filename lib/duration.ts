@@ -31,9 +31,12 @@ export function parseDurationSeconds(value: string | number | null | undefined):
     return seconds > 0 ? Math.floor(seconds) : 0
   }
 
-  const clock = input.match(/^(?:(\d+):)?(\d+):(\d{2})$/)
-  if (clock) {
-    return Number(clock[1] || 0) * 3600 + Number(clock[2]) * 60 + Number(clock[3])
+  const parts = input.split(":").map((part) => Number(part))
+  if (parts.length >= 2 && parts.length <= 4 && parts.every((part) => Number.isFinite(part) && part >= 0)) {
+    const [hours, minutes, seconds] = parts.length === 2
+      ? [0, parts[0], parts[1]]
+      : [parts[0], parts[1], parts[2]]
+    return hours * 3600 + minutes * 60 + seconds
   }
 
   const ph = input.match(/^(\d+)\s*ph(?:ut|út)?\s*(\d{1,2})?s?$/)
@@ -79,6 +82,15 @@ export function formatTotalDurationAsTime(seconds: number): string {
     return `${hours}:${minutes.toString().padStart(2, "0")}:${remainingSeconds.toString().padStart(2, "0")}`
   }
   return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`
+}
+
+export function formatClockDuration(value: string | number | null | undefined): string {
+  const seconds = parseDurationSeconds(value)
+  if (!seconds) return "00:00:00"
+  const hours = Math.floor(seconds / 3600)
+  const minutes = Math.floor((seconds % 3600) / 60)
+  const remainingSeconds = seconds % 60
+  return [hours, minutes, remainingSeconds].map((part) => part.toString().padStart(2, "0")).join(":")
 }
 
 export function formatDuration(seconds: number): string {

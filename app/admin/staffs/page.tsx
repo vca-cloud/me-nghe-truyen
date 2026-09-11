@@ -9,7 +9,6 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { supabase } from "@/lib/supabase"
 import { toast } from "sonner"
 
 type Staff = { id: number; name: string; email: string; locked: boolean }
@@ -20,9 +19,14 @@ export default function StaffsPage() {
   const [form, setForm] = useState({ name: "", email: "", password: "" })
 
   const load = async () => {
-    const { data, error } = await supabase.from("staffs").select("*").order("id")
-    if (error) toast.error(`Lỗi tải quản trị viên: ${error.message}`)
-    else setStaffs(data || [])
+    try {
+      const response = await fetch("/api/admin/staffs", { cache: "no-store" })
+      const payload = await response.json()
+      if (!response.ok) throw new Error(payload?.error || "Không tải được dữ liệu.")
+      setStaffs(payload.staffs || [])
+    } catch (error) {
+      toast.error(`Lỗi tải quản trị viên: ${error instanceof Error ? error.message : "Không tải được dữ liệu."}`)
+    }
   }
 
   useEffect(() => {
@@ -44,34 +48,42 @@ export default function StaffsPage() {
       return
     }
 
-    const result = editing
-      ? await supabase.from("staffs").update({ name, email, ...(password ? { password } : {}) }).eq("id", editing.id)
-      : await supabase.from("staffs").insert({ name, email, password })
-
-    if (result.error) {
-      toast.error(`Lỗi lưu: ${result.error.message}`)
-      return
+    try {
+      const method = editing ? "PUT" : "POST"
+      const body = editing ? { id: editing.id, name, email, ...(password ? { password } : {}) } : { name, email, password }
+      const response = await fetch("/api/admin/staffs", { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+      const payload = await response.json()
+      if (!response.ok) throw new Error(payload?.error || "Không lưu được.")
+      toast.success("Đã lưu quản trị viên")
+      setDialogOpen(false)
+      setForm({ name: "", email: "", password: "" })
+      await load()
+    } catch (error) {
+      toast.error(`Lỗi lưu: ${error instanceof Error ? error.message : "Không lưu được."}`)
     }
-
-    toast.success("Đã lưu quản trị viên")
-    setDialogOpen(false)
-    setForm({ name: "", email: "", password: "" })
-    await load()
   }
 
   const toggle = async (staff: Staff) => {
-    const { error } = await supabase.from("staffs").update({ locked: !staff.locked }).eq("id", staff.id)
-    if (error) toast.error(error.message)
-    else await load()
+    try {
+      const response = await fetch("/api/admin/staffs", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: staff.id, name: staff.name, email: staff.email, locked: !staff.locked }) })
+      const payload = await response.json()
+      if (!response.ok) throw new Error(payload?.error || "Không cập nhật được.")
+      await load()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Không cập nhật được.")
+    }
   }
 
   const remove = async (staff: Staff) => {
     if (!confirm(`Xóa quản trị viên ${staff.name}?`)) return
-    const { error } = await supabase.from("staffs").delete().eq("id", staff.id)
-    if (error) toast.error(`Lỗi xóa: ${error.message}`)
-    else {
+    try {
+      const response = await fetch("/api/admin/staffs", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: staff.id }) })
+      const payload = await response.json()
+      if (!response.ok) throw new Error(payload?.error || "Không xóa được.")
       toast.success("Đã xóa quản trị viên")
       await load()
+    } catch (error) {
+      toast.error(`Lỗi xóa: ${error instanceof Error ? error.message : "Không xóa được."}`)
     }
   }
 

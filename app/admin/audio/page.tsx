@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useState } from "react"
 import { AdminShell } from "@/components/admin/admin-shell"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
@@ -11,12 +11,8 @@ import { toast } from "sonner"
 import { AudioFormDialog, type StoryFormValues } from "@/components/admin/audio-form-dialog"
 import { ImportStoriesDialog } from "@/components/admin/import-stories-dialog"
 import { supabase, type Episode } from "@/lib/supabase"
-import {
-  formatEpisodeDuration,
-  formatTotalDuration,
-  isEmptyDuration,
-  sumDurationSeconds,
-} from "@/lib/duration"
+import { realViewsFor, fakeViewsFor, totalViewsFor } from "@/lib/story-views"
+import { formatClockDuration } from "@/lib/duration"
 
 interface Audio {
   id: number
@@ -30,13 +26,10 @@ interface Audio {
   episodes: number
   duration: string
   plays: string
+  real_views?: number | null
+  base_fake_views?: number | null
   status: string
   episodes_list?: Episode[]
-}
-
-function formatTotalDurationFromEpisodes(episodes: Array<{ duration?: string | number | null }>): string {
-  const totalSeconds = sumDurationSeconds(episodes.map((episode) => episode.duration))
-  return formatEpisodeDuration(totalSeconds)
 }
 
 export default function AudioPage() {
@@ -44,7 +37,6 @@ export default function AudioPage() {
   const [loading, setLoading] = useState(true)
   const [editingStory, setEditingStory] = useState<StoryFormValues | null>(null)
   const [editOpen, setEditOpen] = useState(false)
-  const backfillStarted = useRef(false)
 
   const fetchAudios = async () => {
     setLoading(true)
@@ -76,7 +68,7 @@ export default function AudioPage() {
         return {
           ...story,
           episodes: episodesForStory.length || story.episodes,
-          duration: formatTotalDurationFromEpisodes(episodesForStory),
+          duration: formatClockDuration(story.duration),
           episodes_list: episodesForStory,
         }
       })
@@ -89,25 +81,6 @@ export default function AudioPage() {
       return []
     } finally {
       setLoading(false)
-    }
-  }
-
-  const backfillDurations = async (stories: Audio[]) => {
-    let updatedStories = 0
-
-    for (const story of stories) {
-      const totalDuration = formatTotalDurationFromEpisodes(story.episodes_list || [])
-      const { error } = await supabase
-        .from("stories")
-        .update({ duration: totalDuration === "--" ? null : totalDuration })
-        .eq("id", story.id)
-
-      if (!error) updatedStories += 1
-    }
-
-    if (updatedStories > 0) {
-      toast.success(`Đã đồng bộ thời lượng cho ${updatedStories} truyện từ dữ liệu các tập.`)
-      await fetchAudios()
     }
   }
 
@@ -160,19 +133,7 @@ export default function AudioPage() {
   }
 
   useEffect(() => {
-    const run = async () => {
-      const stories = await fetchAudios()
-      if (backfillStarted.current) return
-      backfillStarted.current = true
-      const needsBackfill = stories.some((story) =>
-        (story.episodes_list || []).some((episode) => isEmptyDuration(episode.duration))
-        || (story.episodes_list || []).length > 0 && (story.duration === "--" || isEmptyDuration(story.duration))
-      )
-      if (needsBackfill) {
-        await backfillDurations(stories)
-      }
-    }
-    void run()
+    void fetchAudios()
   }, [])
 
   return (
@@ -203,6 +164,8 @@ export default function AudioPage() {
               <TableHead>Thể loại</TableHead>
               <TableHead>Số tập</TableHead>
               <TableHead>Thời lượng</TableHead>
+              <TableHead>Lượt nghe ảo</TableHead>
+              <TableHead>Lượt nghe thực</TableHead>
               <TableHead>Lượt nghe</TableHead>
               <TableHead>Trạng thái</TableHead>
               <TableHead className="w-32">Hành động</TableHead>
@@ -211,13 +174,13 @@ export default function AudioPage() {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-8">
+                <TableCell colSpan={9} className="text-center py-8">
                   Đang tải dữ liệu...
                 </TableCell>
               </TableRow>
             ) : audioList.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                   Chưa có truyện nào. Bấm &quot;+ Thêm truyện&quot; để bắt đầu.
                 </TableCell>
               </TableRow>
@@ -233,8 +196,10 @@ export default function AudioPage() {
                     </div>
                   </TableCell>
                   <TableCell>{audio.episodes_list?.length || audio.episodes || 0}</TableCell>
-                  <TableCell>{formatTotalDurationFromEpisodes(audio.episodes_list || [])}</TableCell>
-                  <TableCell>{audio.plays}</TableCell>
+                  <TableCell>{formatClockDuration(audio.duration)}</TableCell>
+                  <TableCell>{fakeViewsFor(audio).toLocaleString()}</TableCell>
+                  <TableCell>{realViewsFor(audio).toLocaleString()}</TableCell>
+                  <TableCell>{totalViewsFor(audio).toLocaleString()}</TableCell>
                   <TableCell>
                     <Badge variant={audio.status === "Đang cập nhật" ? "default" : "secondary"}>
                       {audio.status}

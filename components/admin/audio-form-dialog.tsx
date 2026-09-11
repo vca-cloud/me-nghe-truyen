@@ -10,7 +10,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner"
 import { Check, Loader2, Plus, Trash2 } from "lucide-react"
 import { supabase, type Episode } from "@/lib/supabase"
-import { slugify } from "@/lib/slug"
 import { getCategoryOptions } from "@/lib/category-options"
 import {
   formatEpisodeDuration,
@@ -147,7 +146,6 @@ export function AudioFormDialog({ story = null, open: controlledOpen, onOpenChan
     const totalDuration = formatTotalDuration(sumDurationSeconds(resolvedEpisodes.map((episode) => episode.duration)))
     const payload = {
       title: formData.title.trim(),
-      slug: slugify(formData.title),
       author: formData.author.trim(),
       genre: formData.genre,
       description: formData.description.trim(),
@@ -159,14 +157,9 @@ export function AudioFormDialog({ story = null, open: controlledOpen, onOpenChan
     }
 
     try {
-      const saveStory = (storyPayload: typeof payload | Omit<typeof payload, "slug">) => isEditing
-        ? supabase.from("stories").update(storyPayload).eq("id", story!.id!).select()
-        : supabase.from("stories").insert([{ ...storyPayload, plays: "0" }]).select()
-      let { data: storyData, error } = await saveStory(payload)
-      if (error?.code === "PGRST204" && error.message.includes("slug")) {
-        const { slug: _slug, ...legacyPayload } = payload
-        ;({ data: storyData, error } = await saveStory(legacyPayload))
-      }
+      const { data: storyData, error } = isEditing
+        ? await supabase.from("stories").update(payload).eq("id", story!.id!).select()
+        : await supabase.from("stories").insert([{ ...payload, plays: "0" }]).select()
       if (error) throw error
       const storyId = isEditing ? story!.id! : storyData?.[0]?.id
       if (!storyId) throw new Error("Không lấy được ID bộ truyện.")

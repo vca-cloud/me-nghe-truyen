@@ -34,38 +34,34 @@ interface Story {
   status: string | null
 }
 
-function storyPath(story: Pick<Story, "slug" | "title">) {
-  return story.slug || slugify(story.title)
+function storyPath(story: Pick<Story, "title">) {
+  return slugify(story.title)
 }
 
 export default async function TrackPage({ params }: { params: Promise<{ slug?: string; id?: string }> }) {
   const routeParams = await params
   const paramValue = decodeURIComponent(routeParams.slug || routeParams.id || "")
 
-  // Thử tìm theo slug trước
-  let { data: story } = await supabase
-    .from("stories")
-    .select("*")
-    .eq("slug", paramValue)
-    .single()
+  let story: Story | null = null
 
-  // Nếu không tìm thấy theo slug, thử tìm theo ID
-  if (!story) {
+  // Nếu paramValue là số, tìm theo ID
+  const numericId = Number(paramValue)
+  if (Number.isInteger(numericId) && numericId > 0) {
     const { data } = await supabase
       .from("stories")
       .select("*")
-      .eq("id", paramValue)
+      .eq("id", numericId)
       .single()
     story = data
   }
 
-  // Nếu vẫn không tìm thấy, thử tìm theo title (slugified)
+  // Nếu chưa tìm thấy, tìm theo slug/title (không query cột slug)
   if (!story) {
     const { data: allStories } = await supabase.from("stories").select("*")
     story = allStories?.find((item) => {
-      const generatedSlug = item.slug || slugify(item.title)
+      const generatedSlug = slugify(item.title)
       return generatedSlug === paramValue
-    }) as Story | undefined
+    }) as Story | undefined || null
   }
 
   if (!story) notFound()
