@@ -25,33 +25,36 @@ export function EpisodeList({ episodes, selectedEpisode, onSelect, status }: Epi
       <h3 className="text-lg font-semibold mb-4">Danh sách tập</h3>
       <ScrollArea className="h-[400px] pr-4">
         <div className="space-y-2">
-          {episodes.map((episode) => (
+          {episodes.map((episode) => {
+            const isSelected = episode.episode_number === localSelected
+            return (
             <Button
               key={episode.id}
-              variant={episode.episode_number === localSelected ? "default" : "outline"}
-              className="w-full justify-start h-auto py-3 px-4 text-left"
+              variant={isSelected ? "default" : "outline"}
+              className="h-auto w-full justify-start px-4 py-3 text-left"
               onClick={() => handleSelect(episode)}
             >
-              <div className="flex items-center gap-3 w-full">
-                <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full bg-background border">
-                  <Play className="h-4 w-4" />
+              <div className="flex w-full items-center gap-3">
+                <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border bg-background">
+                  <Play className="h-4 w-4 text-[#154B95]" />
                 </div>
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium truncate">Tập {episode.episode_number}</div>
-                  <div className="truncate text-sm font-medium" style={{ color: "#154B95" }}>{episode.title}</div>
+                <div className="min-w-0 flex-1">
+                  <div className={`truncate font-medium ${isSelected ? "text-white dark:text-[#154B95]" : "text-[#154B95]"}`}>Tập {episode.episode_number}</div>
+                  <div className={`truncate text-sm font-medium ${isSelected ? "text-white/90 dark:text-[#154B95]" : "text-[#154B95]"}`}>{episode.title}</div>
                 </div>
                 <div className="flex-shrink-0">
                   {status === "locked" ? (
                     <Lock className="h-4 w-4 text-muted-foreground" />
                   ) : (
-                    <Badge variant="outline" className="bg-background">
+                    <Badge variant="outline" className="bg-background text-[#154B95]">
                       {episode.duration || "0:00"}
                     </Badge>
                   )}
                 </div>
               </div>
             </Button>
-          ))}
+            )
+          })}
         </div>
       </ScrollArea>
     </div>
