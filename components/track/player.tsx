@@ -68,10 +68,10 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(funct
   const [playbackRate, setPlaybackRate] = useState(1)
   const [error, setError] = useState<string | null>(null)
 
-  const saveProgress = async (completed = false) => {
+  const saveProgress = async (completed = false, force = false) => {
     if (!storyId || !audioRef.current || !Number.isFinite(duration)) return
     const progress = audioRef.current.currentTime
-    if (!completed && Math.abs(progress - lastSavedRef.current) < 5) return
+    if (!force && !completed && Math.abs(progress - lastSavedRef.current) < 5) return
     lastSavedRef.current = progress
     await fetch("/api/listening-history", {
       method: "PUT",
@@ -166,6 +166,7 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(funct
           if (!startedRef.current) {
             startedRef.current = true
             onPlayStarted?.()
+            void saveProgress(false, true)
           }
         }}
         onPause={() => {
