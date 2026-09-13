@@ -6,7 +6,6 @@ import { Card } from "@/components/ui/card"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { ImageWithFallback } from "@/components/image-with-fallback"
 import { formatClockDuration } from "@/lib/duration"
 import { slugify } from "@/lib/slug"
 import { LogOut, Headphones, Clock, Play } from "lucide-react"
@@ -150,7 +149,9 @@ export function AccountPage({ user }: AccountPageProps) {
                   <Link key={fav.story_id} href={storyUrl} className="block">
                     <Card className="p-4 transition-colors hover:bg-accent">
                       <div className="flex items-center gap-4">
-                        <ImageWithFallback src={story.cover_url || ""} alt={story.title} className="h-20 w-20 rounded object-cover" />
+                        <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded border bg-muted text-[#154B95]" role="img" aria-label={story.title}>
+                          <Headphones className="h-10 w-10" strokeWidth={1.5} />
+                        </div>
                         <div className="min-w-0 flex-1">
                           <h3 className="truncate text-lg font-semibold text-[#154B95]">{story.title}</h3>
                           <p className="text-sm text-muted-foreground">{story.author} • {story.episodes} tập</p>
@@ -193,7 +194,9 @@ export function AccountPage({ user }: AccountPageProps) {
                     <Card className="p-4 transition-colors hover:bg-accent">
                       <div className="flex items-center gap-4">
                         <div className="relative">
-                          <ImageWithFallback src={story.cover_url || ""} alt={story.title} className="h-20 w-20 rounded object-cover" />
+                          <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded border bg-muted text-[#154B95]" role="img" aria-label={story.title}>
+                          <Headphones className="h-10 w-10" strokeWidth={1.5} />
+                        </div>
                           {item.completed && (
                             <div className="absolute inset-0 flex items-center justify-center rounded bg-black/60">
                               <Play className="h-6 w-6 text-white" fill="white" />
