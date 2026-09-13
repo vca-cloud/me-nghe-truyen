@@ -9,7 +9,7 @@ export async function GET(request: Request) {
   const episodeId = params.get("episodeId")
   let query = supabase
     .from("listening_history")
-    .select("*, stories(id, title, slug, cover_url), episodes(id, episode_number, title, duration)")
+    .select("*, stories(id, title, cover_url), episodes(id, episode_number, title, duration)")
     .eq("user_id", user.id)
     .order("last_played_at", { ascending: false })
   if (storyId && Number.isInteger(Number(storyId))) query = query.eq("story_id", Number(storyId))

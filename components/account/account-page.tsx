@@ -24,7 +24,6 @@ interface FavoriteItem {
   stories: {
     id: number
     title: string
-    slug: string | null
     author: string
     cover_url: string | null
     genre: string
@@ -41,7 +40,7 @@ interface HistoryItem {
   duration_seconds: number
   completed: boolean
   last_played_at: string
-  stories: { id: number; title: string; slug: string | null; cover_url: string | null } | null
+  stories: { id: number; title: string; cover_url: string | null } | null
   episodes: { id: number; episode_number: number; title: string; duration: string } | null
 }
 
@@ -146,7 +145,7 @@ export function AccountPage({ user }: AccountPageProps) {
             <div className="space-y-3">
               {favorites.map((fav) => {
                 const story = fav.stories
-                const storyUrl = `/track/${story.slug || story.id}`
+                const storyUrl = `/track/${slugify(story.title) || story.id}`
                 return (
                   <Link key={fav.story_id} href={storyUrl} className="block">
                     <Card className="p-4 transition-colors hover:bg-accent">
@@ -186,7 +185,7 @@ export function AccountPage({ user }: AccountPageProps) {
                 const story = item.stories
                 const episode = item.episodes
                 if (!story) return null
-                const storyUrl = `/track/${story.slug || story.id}`
+                const storyUrl = `/track/${slugify(story.title) || story.id}`
                 const progressPercent = item.duration_seconds > 0 ? Math.round((item.progress_seconds / item.duration_seconds) * 100) : 0
                 const lastPlayed = new Date(item.last_played_at).toLocaleDateString("vi-VN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
                 return (

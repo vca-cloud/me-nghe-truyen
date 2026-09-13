@@ -18,7 +18,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ saved: Boolean(data) })
   }
   const { data, error: queryError } = await supabase
-    .from("favorites").select("story_id, created_at, stories(*)").eq("user_id", user.id).order("created_at", { ascending: false })
+    .from("favorites").select("story_id, created_at, stories(id, title, author, cover_url, genre, episodes, duration)").eq("user_id", user.id).order("created_at", { ascending: false })
   if (queryError) return NextResponse.json({ error: queryError.message }, { status: 500 })
   return NextResponse.json({ favorites: data || [] })
 }
