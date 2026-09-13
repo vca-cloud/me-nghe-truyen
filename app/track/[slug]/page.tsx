@@ -1,6 +1,6 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
-import { Bookmark, Headphones, ListPlus } from "lucide-react"
+import { Headphones } from "lucide-react"
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { TrackExperience } from "@/components/track/track-experience"
+import { TrackActions } from "@/components/track/track-actions"
 import { ImageWithFallback } from "@/components/image-with-fallback"
 import { getEpisodes, supabase } from "@/lib/supabase"
 import { slugify } from "@/lib/slug"
@@ -136,8 +137,7 @@ export default async function TrackPage({ params }: { params: Promise<{ slug?: s
               <p className="text-justify text-sm leading-6 text-muted-foreground">{story.description || "Chưa có mô tả."}</p>
               <div className="flex flex-wrap gap-2">
                 <Button className="flex-1" nativeButton={false} render={<a href="#audio-player" />}>Nghe tiếp</Button>
-                <Button variant="outline" size="icon" aria-label="Yêu thích"><Bookmark className="h-4 w-4" /></Button>
-                <Button variant="outline" size="icon" aria-label="Thêm vào danh sách"><ListPlus className="h-4 w-4" /></Button>
+                <TrackActions storyId={story.id} nextPath={`/track/${storyPath(story)}`} />
               </div>
             </section>
             <div className="rounded-lg border p-4 text-sm text-muted-foreground">

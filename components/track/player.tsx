@@ -7,6 +7,13 @@ import { Slider } from "@/components/ui/slider"
 import { Headphones, Pause, Play, RotateCcw, RotateCw, SkipBack, SkipForward } from "lucide-react"
 import { ImageWithFallback } from "@/components/image-with-fallback"
 
+interface HistoryRow {
+  episode_id: number | null
+  progress_seconds: number
+  duration_seconds: number
+  completed: boolean
+}
+
 export interface AudioPlayerHandle {
   playAudio: () => Promise<void>
 }
@@ -23,6 +30,7 @@ interface AudioPlayerProps {
   isUnlocked?: boolean
   onShowAffiliate?: () => void
   storyId?: number
+  episodeId?: number | null
 }
 
 function formatTime(seconds: number) {
@@ -44,17 +52,34 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(funct
     onPlayStarted,
     isUnlocked = false,
     onShowAffiliate,
+    storyId,
+    episodeId = null,
   },
   ref
 ) {
   const router = useRouter()
   const audioRef = useRef<HTMLAudioElement>(null)
   const startedRef = useRef(false)
+  const lastSavedRef = useRef(0)
+  const restoredRef = useRef(false)
   const [isPlaying, setIsPlaying] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(0)
   const [playbackRate, setPlaybackRate] = useState(1)
   const [error, setError] = useState<string | null>(null)
+
+  const saveProgress = async (completed = false) => {
+    if (!storyId || !audioRef.current || !Number.isFinite(duration)) return
+    const progress = audioRef.current.currentTime
+    if (!completed && Math.abs(progress - lastSavedRef.current) < 5) return
+    lastSavedRef.current = progress
+    await fetch("/api/listening-history", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ storyId, episodeId, progressSeconds: progress, durationSeconds: duration, completed }),
+      keepalive: true,
+    }).catch(() => undefined)
+  }
 
   const playAudio = async () => {
     const audio = audioRef.current
@@ -81,7 +106,22 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(funct
     setDuration(0)
     setError(null)
     startedRef.current = false
-  }, [audioUrl])
+    restoredRef.current = false
+    lastSavedRef.current = 0
+
+    const loadProgress = async () => {
+      const response = await fetch(`/api/listening-history?storyId=${storyId}&episodeId=${episodeId || ""}`).catch(() => null)
+      if (!response?.ok) return
+      const data = await response.json().catch(() => ({})) as { history?: HistoryRow[] }
+      const row = data.history?.[0]
+      if (row && !row.completed && row.progress_seconds > 0) {
+        audio.currentTime = row.progress_seconds
+        setCurrentTime(row.progress_seconds)
+      }
+      restoredRef.current = true
+    }
+    void loadProgress()
+  }, [audioUrl, episodeId, storyId])
 
   const togglePlay = () => {
     if (!isUnlocked) {
@@ -117,7 +157,10 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(funct
         src={audioUrl}
         preload="metadata"
         onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
-        onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
+        onTimeUpdate={(e) => {
+          setCurrentTime(e.currentTarget.currentTime)
+          if (restoredRef.current && e.currentTarget.currentTime - lastSavedRef.current >= 10) void saveProgress()
+        }}
         onPlay={() => {
           setIsPlaying(true)
           if (!startedRef.current) {
@@ -125,9 +168,13 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(funct
             onPlayStarted?.()
           }
         }}
-        onPause={() => setIsPlaying(false)}
+        onPause={() => {
+          setIsPlaying(false)
+          void saveProgress()
+        }}
         onEnded={() => {
           setIsPlaying(false)
+          void saveProgress(true)
           startedRef.current = false
           onEnded?.()
           if (!onEnded) navigate(nextTrackId)

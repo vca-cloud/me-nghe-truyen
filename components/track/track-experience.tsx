@@ -116,6 +116,7 @@ export function TrackExperience({
         ref={audioPlayerRef}
         title={title}
         storyId={storyId}
+        episodeId={selectedEpisode.id || null}
         audioUrl={selectedEpisode.audio_url}
         coverUrl={coverUrl}
         episodeTitle={`Tập ${selectedEpisode.episode_number}: ${selectedEpisode.title}`}

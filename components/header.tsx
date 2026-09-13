@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { Button } from "@/components/ui/button"
+import { ChevronDown, LogOut, UserCircle } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Search } from "lucide-react"
 import Link from "next/link"
@@ -11,6 +11,7 @@ import type { User } from "@supabase/supabase-js"
 
 export function Header({ value = "", onChange = () => {}, onKeyDown = () => {}, suggestions = [], onSuggestion = () => {} }: { value?: string; onChange?: (value: string) => void; onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void; suggestions?: any[]; onSuggestion?: (story: any) => void }) {
   const [user, setUser] = useState<User | null>(null)
+  const [menuOpen, setMenuOpen] = useState(false)
   const supabase = useMemo(() => createClient(), [])
 
   useEffect(() => {
@@ -23,6 +24,7 @@ export function Header({ value = "", onChange = () => {}, onKeyDown = () => {}, 
   const signOut = async () => {
     await supabase.auth.signOut()
     setUser(null)
+    setMenuOpen(false)
   }
 
   const displayName = user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split("@")[0] || "Tài khoản"
@@ -71,10 +73,19 @@ export function Header({ value = "", onChange = () => {}, onKeyDown = () => {}, 
         <div className="flex items-center gap-3">
           <ThemeToggle />
           {user
-            ? <button type="button" onClick={() => void signOut()} className="flex items-center gap-2 rounded-md border px-2 py-1 text-xs hover:bg-muted" title="Đăng xuất">
-                {showAvatar ? <img src={avatarUrl} alt={displayName} className="h-6 w-6 rounded-full object-cover" /> : <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground text-[10px] font-medium">{initials}</span>}
-                <span className="max-w-28 truncate">{displayName}</span>
-              </button>
+            ? <div className="relative">
+                <button type="button" onClick={() => setMenuOpen((open) => !open)} className="flex items-center gap-2 rounded-md border px-2 py-1 text-xs hover:bg-muted" aria-expanded={menuOpen} aria-haspopup="menu">
+                  {showAvatar ? <img src={avatarUrl} alt={displayName} className="h-6 w-6 rounded-full object-cover" /> : <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground text-[10px] font-medium">{initials}</span>}
+                  <span className="max-w-28 truncate">{displayName}</span>
+                  <ChevronDown className="h-3 w-3" />
+                </button>
+                {menuOpen && <div role="menu" className="absolute right-0 top-full z-[80] mt-2 w-48 rounded-lg border bg-background p-1 shadow-lg">
+                  <Link href="/account" onClick={() => setMenuOpen(false)} className="flex items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-muted" role="menuitem"><UserCircle className="h-4 w-4" />Tài khoản</Link>
+                  <Link href="/account#favorites" onClick={() => setMenuOpen(false)} className="rounded-md px-3 py-2 text-sm hover:bg-muted" role="menuitem">Audio đã lưu</Link>
+                  <Link href="/account#history" onClick={() => setMenuOpen(false)} className="rounded-md px-3 py-2 text-sm hover:bg-muted" role="menuitem">Lịch sử nghe</Link>
+                  <button type="button" onClick={() => void signOut()} className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm hover:bg-muted" role="menuitem"><LogOut className="h-4 w-4" />Đăng xuất</button>
+                </div>}
+              </div>
             : <>
                 <Link href="/login" className="inline-flex h-8 items-center gap-2 rounded-md border px-3 text-xs font-medium hover:bg-muted">Đăng nhập</Link>
                 <Link href="/signup" className="inline-flex h-8 items-center gap-2 rounded-md border px-3 text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90">Đăng ký</Link>
