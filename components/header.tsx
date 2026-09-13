@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { ChevronDown, LogOut, UserCircle } from "lucide-react"
+import { Bookmark, ChevronDown, Clock3, LogOut, UserCircle } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Search } from "lucide-react"
 import Link from "next/link"
@@ -79,11 +79,12 @@ export function Header({ value = "", onChange = () => {}, onKeyDown = () => {}, 
                   <span className="max-w-28 truncate">{displayName}</span>
                   <ChevronDown className="h-3 w-3" />
                 </button>
-                {menuOpen && <div role="menu" className="absolute right-0 top-full z-[80] mt-2 w-48 rounded-lg border bg-background p-1 shadow-lg">
-                  <Link href="/account" onClick={() => setMenuOpen(false)} className="flex items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-muted" role="menuitem"><UserCircle className="h-4 w-4" />Tài khoản</Link>
-                  <Link href="/account#favorites" onClick={() => setMenuOpen(false)} className="rounded-md px-3 py-2 text-sm hover:bg-muted" role="menuitem">Audio đã lưu</Link>
-                  <Link href="/account#history" onClick={() => setMenuOpen(false)} className="rounded-md px-3 py-2 text-sm hover:bg-muted" role="menuitem">Lịch sử nghe</Link>
-                  <button type="button" onClick={() => void signOut()} className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm hover:bg-muted" role="menuitem"><LogOut className="h-4 w-4" />Đăng xuất</button>
+                {menuOpen && <div role="menu" className="absolute right-0 top-full z-[80] mt-2 w-56 rounded-xl border bg-background p-2 shadow-lg">
+                  <Link href="/account" onClick={() => setMenuOpen(false)} className="flex h-10 items-center gap-3 rounded-md px-3 text-sm hover:bg-muted" role="menuitem"><UserCircle className="h-4 w-4" />Tài khoản</Link>
+                  <Link href="/account#favorites" onClick={() => setMenuOpen(false)} className="flex h-10 items-center gap-3 rounded-md px-3 text-sm hover:bg-muted" role="menuitem"><Bookmark className="h-4 w-4" />Audio đã lưu</Link>
+                  <Link href="/account#history" onClick={() => setMenuOpen(false)} className="flex h-10 items-center gap-3 rounded-md px-3 text-sm hover:bg-muted" role="menuitem"><Clock3 className="h-4 w-4" />Lịch sử nghe</Link>
+                  <div className="my-1 border-t" />
+                  <button type="button" onClick={() => void signOut()} className="flex h-10 w-full items-center gap-3 rounded-md px-3 text-left text-sm hover:bg-muted" role="menuitem"><LogOut className="h-4 w-4" />Đăng xuất</button>
                 </div>}
               </div>
             : <>
