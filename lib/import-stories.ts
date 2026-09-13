@@ -25,40 +25,65 @@ export interface ParseResult {
   errors: ParseError[]
 }
 
-function parseCSVLine(line: string): string[] {
-  const result: string[] = []
+function parseCSVRecords(content: string): Array<{ values: string[]; line: number }> {
+  const records: Array<{ values: string[]; line: number }> = []
+  let values: string[] = []
   let current = ""
   let inQuotes = false
+  let line = 1
+  let recordLine = 1
 
-  for (let i = 0; i < line.length; i++) {
-    const char = line[i]
-    const nextChar = line[i + 1]
+  const pushField = () => {
+    values.push(current.trim())
+    current = ""
+  }
+  const pushRecord = () => {
+    pushField()
+    if (values.some((value) => value.trim())) records.push({ values, line: recordLine })
+    values = []
+  }
+
+  for (let i = 0; i < content.length; i++) {
+    const char = content[i]
+    const nextChar = content[i + 1]
 
     if (char === '"' && inQuotes && nextChar === '"') {
       current += '"'
       i++
     } else if (char === '"') {
       inQuotes = !inQuotes
+    } else if (char === "\\n" && !inQuotes) {
+      pushRecord()
+      line++
+      recordLine = line
+    } else if (char === "\\r") {
+      if (nextChar === "\\n") continue
+      if (!inQuotes) {
+        pushRecord()
+        line++
+        recordLine = line
+      } else {
+        current += char
+      }
     } else if (char === "," && !inQuotes) {
-      result.push(current.trim())
-      current = ""
+      pushField()
     } else {
       current += char
+      if (char === "\\n") line++
     }
   }
 
-  result.push(current.trim())
-  return result
+  if (current || values.length) pushRecord()
+  return records
 }
 
 export function parseCSV(content: string): ParseResult {
-  const lines = content.split(/\r?\n/).filter((line) => line.trim())
-  if (lines.length === 0) {
+  const records = parseCSVRecords(content)
+  if (records.length === 0) {
     return { stories: [], errors: [{ line: 0, field: "file", message: "File CSV rỗng" }] }
   }
 
-  const headerLine = lines[0]
-  const headers = parseCSVLine(headerLine).map((h) => h.toLowerCase().trim())
+  const headers = records[0].values.map((h) => h.toLowerCase().trim())
 
   const requiredFields = ["title", "audio_url"]
   const missingFields = requiredFields.filter((field) => !headers.includes(field))
@@ -72,20 +97,22 @@ export function parseCSV(content: string): ParseResult {
   const rows: Array<Record<string, string>> = []
   const errors: ParseError[] = []
 
-  for (let i = 1; i < lines.length; i++) {
-    const line = lines[i]
-    if (!line.trim()) continue
+  for (let i = 1; i < records.length; i++) {
+    const record = records[i]
+    const values = record.values
 
-    const values = parseCSVLine(line)
     if (values.length !== headers.length) {
-      errors.push({ line: i + 1, field: "row", message: `Số cột không khớp (${values.length} vs ${headers.length})` })
+      errors.push({ line: record.line, field: "row", message: `Số cột không khớp (${values.length} vs ${headers.length})` })
       continue
     }
 
     const row: Record<string, string> = {}
     headers.forEach((header, index) => {
-      row[header] = values[index] || ""
+      row[header] = (values[index] || "").trim()
     })
+
+    if (!row.title && !row.audio_url) continue
+
     rows.push(row)
   }
 
@@ -178,7 +205,7 @@ function groupRowsIntoStories(rows: Array<Record<string, unknown>>, errors: Pars
   const grouped = new Map<string, Array<{ row: Record<string, unknown>; index: number }>>()
 
   rows.forEach((row, index) => {
-    const title = String(row.title || "").trim().toLowerCase()
+    const title = String(row.title || "").trim()
     if (!title) {
       errors.push({ line: startLine + index + 1, field: "title", message: "Thiếu title" })
       return
@@ -190,9 +217,10 @@ function groupRowsIntoStories(rows: Array<Record<string, unknown>>, errors: Pars
       return
     }
 
-    const items = grouped.get(title) || []
+    const normalizedTitle = title.toLowerCase()
+    const items = grouped.get(normalizedTitle) || []
     items.push({ row, index })
-    grouped.set(title, items)
+    grouped.set(normalizedTitle, items)
   })
 
   const stories: ParsedStory[] = []
