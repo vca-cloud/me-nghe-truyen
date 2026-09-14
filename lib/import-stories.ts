@@ -52,12 +52,12 @@ function parseCSVRecords(content: string): Array<{ values: string[]; line: numbe
       i++
     } else if (char === '"') {
       inQuotes = !inQuotes
-    } else if (char === "\\n" && !inQuotes) {
+    } else if (char === "\n" && !inQuotes) {
       pushRecord()
       line++
       recordLine = line
-    } else if (char === "\\r") {
-      if (nextChar === "\\n") continue
+    } else if (char === "\r") {
+      if (nextChar === "\n") continue
       if (!inQuotes) {
         pushRecord()
         line++
@@ -69,7 +69,7 @@ function parseCSVRecords(content: string): Array<{ values: string[]; line: numbe
       pushField()
     } else {
       current += char
-      if (char === "\\n") line++
+      if (char === "\n") line++
     }
   }
 
