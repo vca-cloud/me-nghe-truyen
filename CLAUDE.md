@@ -37,6 +37,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
 ADMIN_SESSION_SECRET=
 NEXT_PUBLIC_R2_PUBLIC_URL=
+NEXT_PUBLIC_SITE_URL=https://menghetruyen.com
 ```
 
 ## Cấu trúc và route
@@ -100,9 +101,17 @@ Social proof “Đang nghe” là mô phỏng phía client, không phải teleme
 
 Palette trong [app/globals.css](app/globals.css): nền light `#D4EEED`, nền dark `#102D54`, xanh đậm/chữ card `#154B95`, xanh nhạt `#9ECDDD`, xanh trung gian `#689EC2`/`#2D74A8`, cam `#EE4D2D`. `ThemeToggle` áp class `dark` lên `<html>` và lưu lựa chọn trong localStorage. Chữ trên card mint phải đủ tương phản; ưu tiên `#154B95` cho tiêu đề, mô tả, thể loại, số tập và duration.
 
-## Auth và header
+## Domain và Auth redirect
 
-- Member dùng Supabase Auth email/password hoặc Google OAuth.
+Domain production chuẩn là `https://menghetruyen.com`. Login/signup dùng `NEXT_PUBLIC_SITE_URL` để tạo callback URL ổn định, thay vì phụ thuộc vào domain preview Vercel:
+
+```bash
+NEXT_PUBLIC_SITE_URL=https://menghetruyen.com
+```
+
+Khi đổi domain, cập nhật một lần trong Vercel Environment Variables và thêm domain/callback tương ứng trong Supabase Auth URL Configuration. Supabase nên có Site URL `https://menghetruyen.com` và redirect `https://menghetruyen.com/auth/callback`; giữ thêm `http://localhost:3000/auth/callback` cho local. `lib/site-url.ts` cũng chặn `next` không phải đường dẫn nội bộ để tránh open redirect.
+
+
 - `app/auth/callback/route.ts` đổi OAuth code lấy session rồi redirect.
 - Supabase Redirect URL phải bao gồm origin thực tế, ví dụ `http://localhost:3000/auth/callback`.
 - `/account` redirect guest tới `/login?next=/account`; bookmark track redirect guest tới login với `next` là track hiện tại.

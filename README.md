@@ -52,9 +52,29 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
 ADMIN_SESSION_SECRET=
 NEXT_PUBLIC_R2_PUBLIC_URL=
+NEXT_PUBLIC_SITE_URL=https://menghetruyen.com
 ```
 
 `SUPABASE_SERVICE_ROLE_KEY` chỉ dùng ở server/API quản trị. `ADMIN_SESSION_SECRET` nên là chuỗi bí mật riêng, đủ dài; nếu bỏ trống code có fallback không phù hợp cho production. `NEXT_PUBLIC_R2_PUBLIC_URL` được dùng bởi các tiện ích tạo URL R2 nếu cần.
+
+## Domain và deployment
+
+Domain production chuẩn của ứng dụng là `https://menghetruyen.com`. Vercel nên được cấu hình domain này ở **Settings → Domains**, đồng thời đặt:
+
+```bash
+NEXT_PUBLIC_SITE_URL=https://menghetruyen.com
+```
+
+Sau khi deploy, dùng một origin chuẩn duy nhất cho các redirect Auth. Google/Supabase OAuth phải có các URL sau trong Supabase Dashboard → Authentication → URL Configuration:
+
+```text
+Site URL: https://menghetruyen.com
+Redirect URLs:
+https://menghetruyen.com/auth/callback
+http://localhost:3000/auth/callback
+```
+
+Các form login/signup lấy callback origin từ `NEXT_PUBLIC_SITE_URL`, nên không redirect người dùng về URL preview Vercel khi biến môi trường production đã được đặt. Khi chạy local, có thể để biến này trống để dùng origin local. Nếu đổi domain trong tương lai, chỉ cần cập nhật domain ở Vercel, `NEXT_PUBLIC_SITE_URL` trong Vercel Environment Variables và danh sách URL trong Supabase; không hard-code domain ở từng component.
 
 ## Supabase
 

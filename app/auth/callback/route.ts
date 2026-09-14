@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server"
 import { createServerClient } from "@supabase/ssr"
 import { syncAdminUser } from "@/lib/sync-admin-user"
+import { getSafeNextPath, getSiteUrl } from "@/lib/site-url"
 
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url)
   const code = requestUrl.searchParams.get("code")
-  const next = requestUrl.searchParams.get("next") || "/"
-  const response = NextResponse.redirect(new URL(next, requestUrl.origin))
+  const next = getSafeNextPath(requestUrl.searchParams.get("next"))
+  const response = NextResponse.redirect(new URL(next, getSiteUrl(requestUrl.origin)))
 
   if (!code) return response
 

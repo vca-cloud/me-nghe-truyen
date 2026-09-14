@@ -6,6 +6,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase-client"
+import { getSiteUrl, getSafeNextPath } from "@/lib/site-url"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field"
@@ -37,12 +38,13 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
     if (error) { toast.error(`Đăng nhập thất bại: ${error.message}`); return }
     await syncUser(data.user)
     toast.success("Đăng nhập thành công")
-    router.push("/")
+    const nextPath = getSafeNextPath(new URLSearchParams(window.location.search).get("next"))
+    router.push(nextPath)
     router.refresh()
   }
 
   const loginWithGoogle = async () => {
-    const redirectTo = `${window.location.origin}/auth/callback`
+    const redirectTo = `${getSiteUrl(window.location.origin)}/auth/callback`
     const { data, error } = await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo, queryParams: { access_type: "offline", prompt: "select_account" } } })
     if (error) { toast.error(`Không thể đăng nhập Google: ${error.message}`); return }
     if (!data.url) toast.error("Supabase chưa trả về URL đăng nhập Google")

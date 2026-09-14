@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input"
 import Link from "next/link"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase-client"
+import { getSiteUrl } from "@/lib/site-url"
 
 const inputClass = "dark:bg-[#9ECDDD] dark:text-[#154B95] dark:placeholder:text-[#2D74A8]"
 
@@ -36,7 +37,7 @@ export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
     const { data, error } = await supabase.auth.signUp({
       email: form.email,
       password: form.password,
-      options: { data: { full_name: form.name }, emailRedirectTo: `${window.location.origin}/auth/callback` },
+      options: { data: { full_name: form.name }, emailRedirectTo: `${getSiteUrl(window.location.origin)}/auth/callback` },
     })
 
     if (error) {
@@ -62,12 +63,13 @@ export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
     await syncUser(user)
     setLoading(false)
     toast.success("Đăng ký thành công")
-    router.push("/")
+    const nextPath = new URLSearchParams(window.location.search).get("next")
+    router.push(nextPath?.startsWith("/") && !nextPath.startsWith("//") ? nextPath : "/")
     router.refresh()
   }
 
   const signupWithGoogle = async () => {
-    const redirectTo = `${window.location.origin}/auth/callback`
+    const redirectTo = `${getSiteUrl(window.location.origin)}/auth/callback`
     const { data, error } = await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo, queryParams: { access_type: "offline", prompt: "select_account" } } })
     if (error) { toast.error(`Không thể đăng ký Google: ${error.message}`); return }
     if (!data.url) toast.error("Supabase chưa trả về URL đăng ký Google")
