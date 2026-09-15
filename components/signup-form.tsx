@@ -64,8 +64,8 @@ export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
     setLoading(false)
     toast.success("Đăng ký thành công")
     const nextPath = new URLSearchParams(window.location.search).get("next")
-    router.push(nextPath?.startsWith("/") && !nextPath.startsWith("//") ? nextPath : "/")
-    router.refresh()
+    const safeNext = nextPath?.startsWith("/") && !nextPath.startsWith("//") ? nextPath : "/"
+    window.location.assign(new URL(safeNext, getSiteUrl(window.location.origin)).toString())
   }
 
   const signupWithGoogle = async () => {

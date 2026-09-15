@@ -39,8 +39,8 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
     await syncUser(data.user)
     toast.success("Đăng nhập thành công")
     const nextPath = getSafeNextPath(new URLSearchParams(window.location.search).get("next"))
-    router.push(nextPath)
-    router.refresh()
+    const destination = new URL(nextPath, getSiteUrl(window.location.origin)).toString()
+    window.location.assign(destination)
   }
 
   const loginWithGoogle = async () => {

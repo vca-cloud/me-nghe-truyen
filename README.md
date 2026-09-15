@@ -74,7 +74,7 @@ https://menghetruyen.com/auth/callback
 http://localhost:3000/auth/callback
 ```
 
-Các form login/signup lấy callback origin từ `NEXT_PUBLIC_SITE_URL`, nên không redirect người dùng về URL preview Vercel khi biến môi trường production đã được đặt. Khi chạy local, có thể để biến này trống để dùng origin local. Nếu đổi domain trong tương lai, chỉ cần cập nhật domain ở Vercel, `NEXT_PUBLIC_SITE_URL` trong Vercel Environment Variables và danh sách URL trong Supabase; không hard-code domain ở từng component.
+Các form login/signup và redirect sau khi đăng nhập lấy origin từ `NEXT_PUBLIC_SITE_URL`, nên không redirect người dùng về URL preview Vercel. Code cũng chặn hostname Vercel preview và fallback an toàn về `https://menghetruyen.com` nếu biến môi trường bị thiếu hoặc sai. Khi chạy local, chỉ dùng origin local nếu `NEXT_PUBLIC_SITE_URL` là localhost hoặc để trống. Nếu đổi domain trong tương lai, chỉ cần cập nhật domain ở Vercel, `NEXT_PUBLIC_SITE_URL` trong Vercel Environment Variables và danh sách URL trong Supabase; không hard-code domain ở từng component.
 
 ## Supabase
 

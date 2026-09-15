@@ -2,11 +2,19 @@ const DEFAULT_SITE_URL = "https://menghetruyen.com"
 
 export function getSiteUrl(fallbackOrigin?: string) {
   const configured = process.env.NEXT_PUBLIC_SITE_URL?.trim()
-  if (configured) return configured.replace(/\/$/, "")
+  if (configured) {
+    try {
+      const configuredUrl = new URL(configured)
+      if (configuredUrl.hostname === "menghetruyen.com" || configuredUrl.hostname === "www.menghetruyen.com") {
+        return configuredUrl.origin
+      }
+      if (/^(localhost|127\.0\.0\.1)$/i.test(configuredUrl.hostname)) return configuredUrl.origin
+    } catch {
+      // Fall through to the safe canonical default for malformed values.
+    }
+  }
 
-  // Preview Vercel domains must not become Auth redirect origins. Keep the
-  // browser origin only for local development; production defaults to the
-  // canonical domain even when the Vercel variable was not configured yet.
+  // Never use a Vercel preview hostname for Auth redirects.
   if (fallbackOrigin && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(fallbackOrigin)) {
     return fallbackOrigin.replace(/\/$/, "")
   }
