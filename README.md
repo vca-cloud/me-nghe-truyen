@@ -128,7 +128,10 @@ Trang công khai:
 - `/` — trang chủ
 - `/track/[slug]` — chi tiết truyện, cũng fallback theo ID
 - `/login`, `/signup`, `/auth/callback`
-- `/about` — Read me, điều khoản, bảo mật, miễn trừ và DMCA
+- `/about` — Giới thiệu: tiện ích giải trí, sứ mệnh, tầm nhìn
+- `/privacy` — Chính sách bảo mật
+- `/terms` — Điều khoản sử dụng, miễn trừ trách nhiệm, bảo vệ bản quyền DMCA
+- `/contact` — Liên hệ qua email metruyensupportteam@gmail.com
 - `/account` — khu vực thành viên
 
 API công khai/thành viên:

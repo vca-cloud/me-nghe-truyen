@@ -46,7 +46,10 @@ NEXT_PUBLIC_SITE_URL=https://menghetruyen.com
 ```text
 app/
 ├── page.tsx                         # Trang chủ
-├── about/page.tsx                   # Read me, điều khoản, bảo mật, DMCA
+├── about/page.tsx                   # Giới thiệu: tiện ích giải trí, sứ mệnh, tầm nhìn
+├── privacy/page.tsx                 # Chính sách bảo mật
+├── terms/page.tsx                   # Điều khoản sử dụng, miễn trừ trách nhiệm, DMCA
+├── contact/page.tsx                 # Liên hệ (email hỗ trợ trong components/info-page.tsx)
 ├── account/page.tsx                 # Trang thành viên, yêu cầu đăng nhập
 ├── login/page.tsx / signup/page.tsx
 ├── auth/callback/route.ts           # Đổi OAuth code lấy session
@@ -66,7 +69,7 @@ app/
     └── backup/route.ts
 
 components/
-├── header.tsx, footer.tsx, audio-card.tsx
+├── header.tsx, footer.tsx, audio-card.tsx, info-page.tsx
 ├── login-form.tsx, signup-form.tsx, theme-toggle.tsx
 ├── AffiliateModal.tsx, image-with-fallback.tsx
 ├── account/account-page.tsx
