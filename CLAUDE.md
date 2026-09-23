@@ -20,6 +20,7 @@
 - Supabase `@supabase/supabase-js` + `@supabase/ssr` cho Postgres, Auth, RLS và SSR cookie
 - Cloudflare R2 qua URL công khai
 - `sonner` toast, `recharts` analytics, ESLint
+- Google tag GA4 `G-E8PSHLWY5E` chỉ đặt một lần trong `app/layout.tsx` bằng `next/script` (`afterInteractive`); không thêm tag thứ hai ở page/layout con
 
 ```bash
 npm install

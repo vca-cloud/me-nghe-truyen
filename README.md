@@ -24,6 +24,7 @@
 - Supabase JS/SSR: Postgres, Auth, RLS và session cookie
 - Cloudflare R2 cho URL công khai của audio/ảnh bìa
 - Sonner cho thông báo và Recharts cho analytics
+- Google Analytics 4 (Google tag `G-E8PSHLWY5E`) gắn một lần trong `app/layout.tsx` qua `next/script`
 
 ## Chạy local
 
