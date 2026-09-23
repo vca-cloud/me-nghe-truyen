@@ -12,6 +12,7 @@
 - Khi sửa schema Supabase, tạo/cập nhật migration trong `supabase/migrations/` và chạy trên đúng project trước khi kiểm thử production.
 - Không gọi một thay đổi local là đã push GitHub/deploy Vercel nếu chưa thấy lệnh tương ứng thành công.
 - Khi đề cập code trong tài liệu hoặc review, dùng đường dẫn file tương đối và xác minh file còn tồn tại.
+- Route admin mới (`/api/admin/*`, `/api/backup`) phải tự kiểm tra `isValidAdminSession` từ `lib/admin-session.ts`; middleware không bảo vệ API. Xem mục **Nợ bảo mật**.
 
 ## Lệnh và công nghệ
 
@@ -21,6 +22,7 @@
 - Cloudflare R2 qua URL công khai
 - `sonner` toast, `recharts` analytics, ESLint
 - Google tag GA4 `G-E8PSHLWY5E` chỉ đặt một lần trong `app/layout.tsx` bằng `next/script` (`afterInteractive`); không thêm tag thứ hai ở page/layout con
+- Chưa gắn Google AdSense (chủ dự án để dành cho site mexemtruyen); không tự thêm script AdSense/`ads.txt` nếu chưa được yêu cầu
 
 ```bash
 npm install
@@ -45,7 +47,7 @@ NEXT_PUBLIC_SITE_URL=https://menghetruyen.com
 
 ```text
 app/
-├── page.tsx                         # Trang chủ
+├── page.tsx                         # Trang chủ (server, ISR 60s) → components/home-page.tsx (client)
 ├── about/page.tsx                   # Giới thiệu: tiện ích giải trí, sứ mệnh, tầm nhìn
 ├── privacy/page.tsx                 # Chính sách bảo mật
 ├── terms/page.tsx                   # Điều khoản sử dụng, miễn trừ trách nhiệm, DMCA
@@ -53,7 +55,9 @@ app/
 ├── account/page.tsx                 # Trang thành viên, yêu cầu đăng nhập
 ├── login/page.tsx / signup/page.tsx
 ├── auth/callback/route.ts           # Đổi OAuth code lấy session
-├── track/[slug]/page.tsx            # Track theo slugify(title), fallback ID
+├── track/[slug]/page.tsx            # Track theo slugify(title), fallback ID; ISR 60s; không tìm thấy → redirect("/")
+├── [...slug]/page.tsx               # URL không khớp route nào → redirect 307 về "/"
+├── not-found.tsx                    # notFound() còn lại → redirect về "/"
 ├── admin/{login,analytics,audio,affiliate,users,staffs,categories,settings}/
 └── api/
     ├── home-stories/route.ts
@@ -69,27 +73,30 @@ app/
     └── backup/route.ts
 
 components/
-├── header.tsx, footer.tsx, audio-card.tsx, info-page.tsx
+├── header.tsx, footer.tsx, audio-card.tsx, info-page.tsx, home-page.tsx
 ├── login-form.tsx, signup-form.tsx, theme-toggle.tsx
 ├── AffiliateModal.tsx, image-with-fallback.tsx
 ├── account/account-page.tsx
-├── admin/                             # shell, CRUD, form và import
+├── admin/                             # admin-shell, admin-stats, action-buttons, audio-form(-dialog),
+│                                      # affiliate-manager, category-manager, import-stories-dialog
 ├── track/{player,episode-list,track-actions,track-experience}.tsx
 └── ui/                                # shadcn/ui primitives
 
 lib/
 ├── supabase.ts, supabase-client.ts, supabase-server.ts
-├── admin-session.ts, sync-admin-user.ts
-├── story-views.ts, social-proof.ts, duration.ts, import-stories.ts
-└── slug.ts, category-options.ts, categories.ts, utils.ts
+├── admin-session.ts, sync-admin-user.ts, site-url.ts
+├── story-views.ts, duration.ts, import-stories.ts, home-stories.ts
+├── affiliate-api.ts, category-data.ts, category-options.ts, categories.ts
+├── slug.ts, utils.ts
+└── social-proof.ts, audio-api.ts      # hiện không được import ở đâu
 
-middleware.ts                          # bảo vệ /admin/*, trừ /admin/login
+middleware.ts                          # chỉ bảo vệ trang /admin/*, trừ /admin/login; KHÔNG bảo vệ /api/*
 scripts/lock-staffs-rls.mjs            # script khóa RLS staff bằng service role
 ```
 
 ## Trang chủ và view
 
-`app/page.tsx` lấy `/api/home-stories`, tìm kiếm theo tiêu đề/tác giả/thể loại/mô tả, lọc category và phân trang 6 truyện. API lấy `stories` theo `id DESC`, nên danh sách audio phía dưới là mới nhất trước. Khu **Được nghe nhiều** tạo bản sao và sort giảm dần theo:
+`app/page.tsx` là server component (`revalidate = 60`) gọi `getHomeStories()` trong `lib/home-stories.ts` (service role, chỉ chọn cột cần, chuẩn hóa duration/slug/view) rồi truyền `initialStories` cho `components/home-page.tsx` (client). Client tìm kiếm theo tiêu đề/tác giả/thể loại/mô tả, lọc category, phân trang 6 truyện và chỉ gọi lại `/api/home-stories` (cũng ISR 60s, dùng chung hàm) khi tab focus/visible hoặc khi server không lấy được dữ liệu. Danh sách theo `id DESC`, mới nhất trước. Khu **Được nghe nhiều** tạo bản sao và sort giảm dần theo:
 
 ```text
 total views = real_views + base_fake_views
@@ -99,22 +106,27 @@ total views = real_views + base_fake_views
 
 `real_views` được tăng bởi `/api/increment-views` sau luồng mở khóa audio và ghi `listener_logs` theo IP. Analytics phải dùng cùng mô hình tổng view; khi thay đổi mô hình cần rà soát `lib/story-views.ts`, trang chủ, track và admin analytics cùng lúc.
 
-Social proof “Đang nghe” là mô phỏng phía client, không phải telemetry realtime. `app/page.tsx` giữ map theo story trong `localStorage`; code hiện khởi tạo số khoảng 5–85 và cập nhật theo timer hiện tại. Không mô tả đây là số user thật.
+Social proof “Đang nghe” là mô phỏng phía client, không phải telemetry realtime. Logic nằm trực tiếp trong `components/home-page.tsx` (không dùng `lib/social-proof.ts`): giữ map theo story trong `localStorage`, khởi tạo ngẫu nhiên 5–85 và timer đổi ±5, kẹp trong 5–85. Không mô tả đây là số user thật.
 
 ## Theme và UI
 
 Palette trong [app/globals.css](app/globals.css): nền light `#D4EEED`, nền dark `#102D54`, xanh đậm/chữ card `#154B95`, xanh nhạt `#9ECDDD`, xanh trung gian `#689EC2`/`#2D74A8`, cam `#EE4D2D`. `ThemeToggle` áp class `dark` lên `<html>` và lưu lựa chọn trong localStorage. Chữ trên card mint phải đủ tương phản; ưu tiên `#154B95` cho tiêu đề, mô tả, thể loại, số tập và duration.
 
+Tên thương hiệu luôn viết thường **mê nghe truyện**, in đậm, "mê" màu `#EE4D2D`, "nghe truyện" theo `text-foreground` (tự đổi sáng/tối) — giống logo trong `components/header.tsx`. Trong nội dung trang dùng `<BrandName />` từ `components/info-page.tsx`; component không set cỡ chữ nên kế thừa từ heading/đoạn văn chứa nó.
+
+## Trang thông tin và footer
+
+Footer (`components/footer.tsx`) có 4 link pháp lý theo yêu cầu Google: `/about` (Giới thiệu), `/privacy` (Chính sách bảo mật), `/terms` (Điều khoản sử dụng, Miễn trừ trách nhiệm, DMCA), `/contact` (Liên hệ). Cả 4 trang dùng khung `InfoPage`; email hỗ trợ `metruyensupportteam@gmail.com` là hằng `CONTACT_EMAIL` duy nhất trong `components/info-page.tsx`, các trang khác link sang `/contact` qua `<ContactLink />` thay vì lặp email.
+
 ## Domain và Auth redirect
 
-Domain production chuẩn là `https://menghetruyen.com`. Login/signup dùng `NEXT_PUBLIC_SITE_URL` để tạo callback URL ổn định, thay vì phụ thuộc vào domain preview Vercel:
+Domain production chuẩn là `https://menghetruyen.com`. Vercel project: `me-nghe-truyen-new-1` (team VCA); Functions region `sin1` để gần Supabase `ap-southeast-1` (Singapore) — không đổi về `iad1`. Login/signup dùng `NEXT_PUBLIC_SITE_URL` để tạo callback URL ổn định, thay vì phụ thuộc vào domain preview Vercel:
 
 ```bash
 NEXT_PUBLIC_SITE_URL=https://menghetruyen.com
 ```
 
 Khi đổi domain, cập nhật một lần trong Vercel Environment Variables và thêm domain/callback tương ứng trong Supabase Auth URL Configuration. Supabase nên có Site URL `https://menghetruyen.com` và redirect `https://menghetruyen.com/auth/callback`; giữ thêm `http://localhost:3000/auth/callback` cho local. `lib/site-url.ts` cũng chặn `next` không phải đường dẫn nội bộ để tránh open redirect.
-
 
 - `app/auth/callback/route.ts` đổi OAuth code lấy session rồi redirect.
 - Supabase Redirect URL phải bao gồm origin thực tế, ví dụ `http://localhost:3000/auth/callback`.
@@ -126,6 +138,10 @@ Khi đổi domain, cập nhật một lần trong Vercel Environment Variables v
 ## Track, affiliate và player
 
 `app/track/[slug]/page.tsx` hiển thị thông tin truyện, total views, thể loại, link **Đọc truyện chữ**, player và danh sách tập. `text_url` được dùng khi có giá trị; khi trống, link đọc fallback về track hiện tại. URL track tạo từ `slugify(title)` hoặc ID vì production có thể không có cột `stories.slug`.
+
+Trang track là ISR on-demand (`revalidate = 60` + `generateStaticParams` trả `[]`): lần đầu render rồi cache. Dữ liệu lấy 2 bước: (1) danh sách nhẹ `LIST_COLUMNS` để tìm story theo ID/slug và tính trước/sau/liên quan, (2) song song `select("*")` story + `getEpisodes`. Không `select("*")` toàn bảng, không đọc cookies/session trong page (sẽ phá ISR); dữ liệu theo user nằm ở client component. Lượt nghe trên trang có thể trễ tối đa 60s.
+
+Ảnh bìa dùng `ImageWithFallback`: URL thuộc host `NEXT_PUBLIC_R2_PUBLIC_URL` đi qua `next/image` (khai báo `images.remotePatterns` trong `next.config.ts`), host khác dùng `<img loading="lazy">` để không vỡ ảnh dán thủ công.
 
 `TrackExperience`/`AffiliateModal` yêu cầu hoàn tất affiliate trước khi phát. Link active lấy từ `/api/affiliate-links/active`; click ghi qua `/api/affiliate-links/[id]/click`; preview dùng `/api/affiliate-links/preview`.
 
@@ -150,7 +166,7 @@ Không gọi API ở mọi `timeupdate`. Guest chưa có đồng bộ tiến đ�
 
 ## Admin
 
-Admin đăng nhập riêng tại `/admin/login`; `/admin/*` được middleware bảo vệ bằng cookie `admin_session`. Các module hiện có:
+Admin đăng nhập riêng tại `/admin/login`; trang `/admin/*` được middleware bảo vệ bằng cookie `admin_session`. Thao tác ghi truyện/tập/import/thể loại/affiliate chạy **phía client bằng anon key** (`lib/supabase.ts`) và dựa vào RLS mở — xem **Nợ bảo mật**. Các module hiện có:
 
 | Route | Chức năng |
 | --- | --- |
@@ -193,11 +209,19 @@ Chạy theo thứ tự các file trong `supabase/migrations/`:
 
 Migration member tạo `favorites` (khóa ghép user/story) và `listening_history` (FK story/episode, progress, duration, completed, timestamp), index và RLS. Khi sửa unique/upsert cho row story-level có `episode_id NULL`, phải lưu ý PostgreSQL unique index cho phép nhiều NULL và cần thiết kế khóa/constraint phù hợp.
 
+## Nợ bảo mật (chưa xử lý, rà soát 2026-09-23)
+
+Theo migration trong repo (cần đối chiếu policy thật trên Supabase production):
+
+- `stories`, `episodes`, `categories`, `admin_users`, `affiliate_links` có policy `FOR ALL TO anon, authenticated USING (true) WITH CHECK (true)`. Anon key nằm trong client bundle, nên bất kỳ ai cũng có thể sửa/xóa truyện, đổi URL affiliate hoặc đọc/sửa `admin_users` (email thành viên). Chỉ `staffs` đã được khóa bởi `20250911_lock_staffs_rls.sql`.
+- API dùng service role nhưng **không** kiểm tra `admin_session`: `app/api/admin/users/route.ts` (GET/POST/PUT/DELETE), `app/api/admin/users/sync/route.ts` (trả về toàn bộ email user Auth), `app/api/admin/analytics/route.ts`, `app/api/backup/route.ts`. Các route đã kiểm tra: `admin/login`, `admin/staffs`, `admin/stories`.
+- Hướng sửa: chuyển các thao tác ghi admin sang API server có kiểm tra `isValidAdminSession` + service role, rồi thu hẹp RLS về SELECT cho anon (ẩn `admin_users` hoàn toàn); thêm kiểm tra session vào 4 route trên. Làm thành task riêng, kèm migration.
+
 ## Known limitations và kiểm thử
 
 - Audio/cover hiện dán URL công khai, chưa upload trực tiếp lên R2 từ form.
 - Playlist, hẹn giờ, shuffle và merge local progress guest sau login chưa có nghiệp vụ.
 - Social proof không phản ánh người nghe realtime.
 - Cần kiểm thử guest redirect, favorite add/remove, history ngay khi Play, restore progress, nhiều episode và RLS isolation giữa hai user trên Supabase thật.
-- Trước khi hoàn tất thay đổi chạy `npm run build`, `npm run lint` và `git diff --check`.
+- Trước khi hoàn tất thay đổi chạy `npm run build`, `npm run lint` và `git diff --check`. `npm run lint` toàn repo hiện có sẵn 18 lỗi cũ (chủ yếu admin, `app/page.tsx`, `header.tsx`, `theme-toggle.tsx`); tối thiểu phải `npx eslint <file đã sửa>` sạch và không tăng số lỗi.
 - Next.js 16 có cảnh báo convention `middleware` deprecated, đề xuất `proxy`; chỉ chuyển khi có task riêng và kiểm tra lại middleware bảo vệ admin.

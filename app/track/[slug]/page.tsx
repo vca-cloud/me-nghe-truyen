@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { notFound } from "next/navigation"
+import { redirect } from "next/navigation"
 import { Headphones } from "lucide-react"
 import {
   Breadcrumb,
@@ -43,51 +43,45 @@ function storyPath(story: Pick<Story, "title">) {
   return slugify(story.title)
 }
 
+export const revalidate = 60
+
+export function generateStaticParams() {
+  return []
+}
+
+const LIST_COLUMNS = "id, title, genre, episodes, description, cover_url"
+
 export default async function TrackPage({ params }: { params: Promise<{ slug?: string; id?: string }> }) {
   const routeParams = await params
   const paramValue = decodeURIComponent(routeParams.slug || routeParams.id || "")
 
-  let story: Story | null = null
+  const { data: listData } = await supabase.from("stories").select(LIST_COLUMNS).order("id", { ascending: true })
+  const allStories = (listData ?? []) as Story[]
 
-  // Nếu paramValue là số, tìm theo ID
+  // Không query cột slug vì production có thể không có cột này.
   const numericId = Number(paramValue)
-  if (Number.isInteger(numericId) && numericId > 0) {
-    const { data } = await supabase
-      .from("stories")
-      .select("*")
-      .eq("id", numericId)
-      .single()
-    story = data
-  }
+  const listed =
+    (Number.isInteger(numericId) && numericId > 0 ? allStories.find((item) => item.id === numericId) : undefined) ??
+    allStories.find((item) => slugify(item.title) === paramValue)
+  if (!listed) redirect("/")
 
-  // Nếu chưa tìm thấy, tìm theo slug/title (không query cột slug)
-  if (!story) {
-    const { data: allStories } = await supabase.from("stories").select("*")
-    story = allStories?.find((item) => {
-      const generatedSlug = slugify(item.title)
-      return generatedSlug === paramValue
-    }) as Story | undefined || null
-  }
-
-  if (!story) notFound()
+  const [{ data: storyData }, { data: episodes }] = await Promise.all([
+    supabase.from("stories").select("*").eq("id", listed.id).single(),
+    getEpisodes(listed.id),
+  ])
+  const story = storyData as Story | null
+  if (!story) redirect("/")
 
   const textUrl = story.text_url?.trim() || `/track/${storyPath(story)}`
   const isExternalTextUrl = /^https?:\/\//i.test(textUrl)
 
-  const { data: allStories } = await supabase
-    .from("stories")
-    .select("*")
-    .order("id", { ascending: true })
-
-  const storySlugs = allStories?.map((item) => storyPath(item as Story)).filter(Boolean) ?? []
-  const currentIndex = storySlugs.indexOf(paramValue)
-  const previousTrackSlug = currentIndex > 0 ? storySlugs[currentIndex - 1] : undefined
-  const nextTrackSlug = currentIndex >= 0 && currentIndex < storySlugs.length - 1 ? storySlugs[currentIndex + 1] : undefined
+  const currentIndex = allStories.findIndex((item) => item.id === story.id)
+  const previousTrackSlug = currentIndex > 0 ? storyPath(allStories[currentIndex - 1]) : undefined
+  const nextTrackSlug = currentIndex >= 0 && currentIndex < allStories.length - 1 ? storyPath(allStories[currentIndex + 1]) : undefined
   const relatedStories = allStories
-    ?.filter((item) => item.id !== story.id)
+    .filter((item) => item.id !== story.id)
     .slice(-6)
-    .reverse() as Story[] | undefined
-  const { data: episodes } = await getEpisodes(story.id)
+    .reverse()
 
   return (
     <div className="min-h-screen bg-background">
@@ -107,7 +101,7 @@ export default async function TrackPage({ params }: { params: Promise<{ slug?: s
               <Badge className="w-fit">{totalViewsFor(story).toLocaleString()} lượt nghe</Badge>
               <div className="aspect-square w-full overflow-hidden rounded-xl border">
                 {story.cover_url ? (
-                  <ImageWithFallback src={story.cover_url} alt={story.title} className="h-full w-full object-cover" />
+                  <ImageWithFallback src={story.cover_url} alt={story.title} priority className="h-full w-full object-cover" />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center bg-muted text-muted-foreground" role="img" aria-label={story.title}>
                     <Headphones className="h-1/3 w-1/3" strokeWidth={1.5} />
@@ -160,7 +154,7 @@ export default async function TrackPage({ params }: { params: Promise<{ slug?: s
               />
             </CardContent></Card>
 
-            {relatedStories && relatedStories.length > 0 && <section className="flex flex-col gap-5">
+            {relatedStories.length > 0 && <section className="flex flex-col gap-5">
               <h2 className="text-2xl font-bold">Truyện liên quan</h2>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
                 {relatedStories.map((related) => (
@@ -168,7 +162,7 @@ export default async function TrackPage({ params }: { params: Promise<{ slug?: s
                     <Card className="h-full overflow-hidden transition-colors hover:bg-accent">
                       <div className="aspect-video border-b">
                         {related.cover_url ? (
-                          <ImageWithFallback src={related.cover_url} alt={related.title} className="h-full w-full object-cover" />
+                          <ImageWithFallback src={related.cover_url} alt={related.title} sizes="(max-width: 640px) 100vw, 33vw" className="h-full w-full object-cover" />
                         ) : (
                           <div className="flex h-full w-full items-center justify-center bg-muted text-muted-foreground" role="img" aria-label={related.title}>
                             <Headphones className="h-1/3 w-1/3" strokeWidth={1.5} />

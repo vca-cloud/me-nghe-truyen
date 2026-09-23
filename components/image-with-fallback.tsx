@@ -1,16 +1,38 @@
 "use client"
 
+import Image from "next/image"
 import { Headphones } from "lucide-react"
 import { useState } from "react"
+
+const r2Host = (() => {
+  try {
+    return new URL(process.env.NEXT_PUBLIC_R2_PUBLIC_URL || "").host
+  } catch {
+    return ""
+  }
+})()
+
+function isOptimizable(src: string) {
+  try {
+    const url = new URL(src)
+    return url.protocol === "https:" && Boolean(r2Host) && url.host === r2Host
+  } catch {
+    return false
+  }
+}
 
 export function ImageWithFallback({
   src,
   alt,
   className,
+  sizes = "(max-width: 768px) 100vw, 360px",
+  priority = false,
 }: {
   src: string
   alt: string
   className?: string
+  sizes?: string
+  priority?: boolean
 }) {
   const [hasError, setHasError] = useState(false)
 
@@ -26,10 +48,27 @@ export function ImageWithFallback({
     )
   }
 
+  if (isOptimizable(src)) {
+    return (
+      <Image
+        src={src}
+        alt={alt}
+        width={720}
+        height={720}
+        sizes={sizes}
+        priority={priority}
+        className={className}
+        onError={() => setHasError(true)}
+      />
+    )
+  }
+
   return (
     <img
       src={src}
       alt={alt}
+      loading={priority ? "eager" : "lazy"}
+      decoding="async"
       className={className}
       onError={() => setHasError(true)}
     />
