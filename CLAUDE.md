@@ -208,7 +208,7 @@ Chạy theo thứ tự các file trong `supabase/migrations/`:
 - `20250912_add_story_text_url.sql`
 - `20250913_create_member_account_tables.sql`
 - `20250914_lock_public_writes.sql` — anon/authenticated chỉ SELECT trên stories/episodes/categories/affiliate_links
-- `20250915_record_story_listen.sql` — hàm `record_story_listen` (service_role) chống trùng IP + cộng `real_views` nguyên tử; `/api/increment-views` tự fallback cách cũ nếu hàm chưa có
+- `20250915_record_story_listen.sql` — tạo `listener_logs` nếu thiếu (production chưa từng chạy `20250910`, trước 2026-09-24 log IP không được ghi) và hàm `record_story_listen` (service_role) chống trùng IP + cộng `real_views` nguyên tử; `/api/increment-views` tự fallback cách cũ nếu hàm chưa có
 
 Migration member tạo `favorites` (khóa ghép user/story) và `listening_history` (FK story/episode, progress, duration, completed, timestamp), index và RLS. Khi sửa unique/upsert cho row story-level có `episode_id NULL`, phải lưu ý PostgreSQL unique index cho phép nhiều NULL và cần thiết kế khóa/constraint phù hợp.
 

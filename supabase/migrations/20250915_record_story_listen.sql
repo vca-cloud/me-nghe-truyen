@@ -1,3 +1,16 @@
+-- Production chưa từng chạy 20250910_create_listener_logs.sql, nên tạo bảng ở đây (idempotent).
+CREATE TABLE IF NOT EXISTS public.listener_logs (
+  id BIGSERIAL PRIMARY KEY,
+  ip_address TEXT NOT NULL,
+  story_id BIGINT NOT NULL REFERENCES public.stories(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_listener_logs_story_id ON public.listener_logs(story_id);
+CREATE INDEX IF NOT EXISTS idx_listener_logs_created_at ON public.listener_logs(created_at);
+ALTER TABLE public.listener_logs ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Listener logs service access" ON public.listener_logs;
+CREATE POLICY "Listener logs service access" ON public.listener_logs FOR ALL TO service_role USING (true) WITH CHECK (true);
+
 -- Ghi nhận một lượt nghe nguyên tử: chống trùng theo IP + truyện trong p_window_minutes,
 -- ghi listener_logs và cộng real_views trong cùng một transaction.
 -- Trả về: true = đã cộng, false = trùng trong cửa sổ, NULL = không có truyện.
