@@ -60,6 +60,7 @@ app/
 ├── [...slug]/page.tsx               # URL không khớp route nào → redirect 307 về "/"
 ├── not-found.tsx                    # notFound() còn lại → redirect về "/"
 ├── sitemap.ts, robots.ts            # /sitemap.xml (trang tĩnh + mọi track), /robots.txt (chặn /admin, /api/, /account, /auth/)
+├── favicon.ico, icon.svg, apple-icon.tsx  # icon tai nghe màu thương hiệu (nền #154B95, quai trắng, tai #EE4D2D)
 ├── opengraph-image.tsx              # ảnh chia sẻ mặc định; track/[slug]/opengraph-image.tsx vẽ ảnh theo truyện (lib/og-card.tsx, font assets/fonts/BeVietnamPro-Bold.ttf, OFL)
 ├── admin/{login,analytics,audio,affiliate,users,staffs,categories,settings}/
 └── api/
