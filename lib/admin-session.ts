@@ -1,5 +1,3 @@
-import { cookies } from "next/headers"
-
 export const ADMIN_SESSION_COOKIE = "admin_session"
 export const ADMIN_SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 7
 
@@ -31,19 +29,21 @@ export async function createAdminSession(email: string) {
   return `${payload}.${await sign(payload)}`
 }
 
-export async function isValidAdminSession(value: string | undefined) {
-  if (!value) return false
+export async function readAdminSession(value: string | undefined): Promise<{ email: string } | null> {
+  if (!value) return null
   const [payload, signature] = value.split(".")
-  if (!payload || !signature) return false
-  if (!safeEqual(signature, await sign(payload))) return false
+  if (!payload || !signature) return null
+  if (!safeEqual(signature, await sign(payload))) return null
   try {
-    const { issuedAt } = JSON.parse(atob(payload.replace(/-/g, "+").replace(/_/g, "/")))
-    return typeof issuedAt === "number" && Date.now() - issuedAt < ADMIN_SESSION_MAX_AGE_SECONDS * 1000
+    const { email, issuedAt } = JSON.parse(atob(payload.replace(/-/g, "+").replace(/_/g, "/")))
+    if (typeof email !== "string" || typeof issuedAt !== "number") return null
+    if (Date.now() - issuedAt >= ADMIN_SESSION_MAX_AGE_SECONDS * 1000) return null
+    return { email }
   } catch {
-    return false
+    return null
   }
 }
 
-export async function hasAdminSession() {
-  return isValidAdminSession((await cookies()).get(ADMIN_SESSION_COOKIE)?.value)
+export async function isValidAdminSession(value: string | undefined) {
+  return (await readAdminSession(value)) !== null
 }

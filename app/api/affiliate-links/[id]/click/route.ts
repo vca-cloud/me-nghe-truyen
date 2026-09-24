@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { createClient, type SupabaseClient } from "@supabase/supabase-js"
+import { clientIp } from "@/lib/request-ip"
 
 function createDb(): SupabaseClient | null {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -10,12 +11,24 @@ function createDb(): SupabaseClient | null {
   })
 }
 
-export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+const CLICK_WINDOW_MS = 10 * 60 * 1000
+// Chặn một IP cộng click liên tục cho cùng link (bộ nhớ theo instance).
+const recentClicks = new Map<string, number>()
+
+export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
     const linkId = Number(id)
     if (!Number.isInteger(linkId) || linkId <= 0) {
       return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 })
+    }
+
+    const now = Date.now()
+    const clickKey = `${clientIp(request)}:${linkId}`
+    if ((recentClicks.get(clickKey) ?? 0) > now - CLICK_WINDOW_MS) return NextResponse.json({ ok: true, counted: false })
+    recentClicks.set(clickKey, now)
+    if (recentClicks.size > 5000) {
+      for (const [key, at] of recentClicks) if (at <= now - CLICK_WINDOW_MS) recentClicks.delete(key)
     }
 
     const db = createDb()

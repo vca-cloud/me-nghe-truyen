@@ -12,7 +12,7 @@
 - Khi sửa schema Supabase, tạo/cập nhật migration trong `supabase/migrations/` và chạy trên đúng project trước khi kiểm thử production.
 - Không gọi một thay đổi local là đã push GitHub/deploy Vercel nếu chưa thấy lệnh tương ứng thành công.
 - Khi đề cập code trong tài liệu hoặc review, dùng đường dẫn file tương đối và xác minh file còn tồn tại.
-- Route admin mới (`/api/admin/*`, `/api/backup`) phải gọi `hasAdminSession()` từ `lib/admin-session.ts` ở đầu mỗi handler; middleware không bảo vệ API. Session ký bằng `ADMIN_SESSION_SECRET` (đã đặt trên Vercel), hết hạn sau 7 ngày theo `issuedAt`.
+- Route admin mới (`/api/admin/*`, `/api/backup`) phải gọi `hasAdminSession()` từ `lib/admin-auth.ts` ở đầu mỗi handler (kiểm tra chữ ký cookie + staff còn tồn tại và không bị khóa); middleware chỉ kiểm tra chữ ký và không bảo vệ API. Mật khẩu staff băm scrypt qua `lib/password.ts`; login tự băm lại mật khẩu cũ dạng plaintext và khóa 15 phút sau 5 lần sai (theo IP và email, bộ đếm trong bộ nhớ instance). Session ký bằng `ADMIN_SESSION_SECRET` (đã đặt trên Vercel), hết hạn sau 7 ngày theo `issuedAt`.
 - Tham số `next` sau đăng nhập luôn đi qua `getSafeNextPath` (`lib/site-url.ts`), chặn `//`, `\` và ký tự điều khiển.
 
 ## Lệnh và công nghệ
@@ -213,16 +213,18 @@ Migration member tạo `favorites` (khóa ghép user/story) và `listening_histo
 
 ## Nợ bảo mật (rà soát 2026-09-23/24)
 
-Đã xử lý 2026-09-24: 4 route service role không kiểm tra session (`admin/users`, `admin/users/sync`, `admin/analytics`, `backup`) nay gọi `hasAdminSession()`; `/api/sync-user` lấy user từ session server (bỏ qua body); open redirect `/\evil.com`; session có hạn 7 ngày; đặt `ADMIN_SESSION_SECRET`.
+Đã xử lý 2026-09-24:
+
+- 4 route service role thiếu kiểm tra session nay gọi `hasAdminSession()`; `/api/sync-user` lấy user từ session server; open redirect `/\evil.com`; session hết hạn 7 ngày; `ADMIN_SESSION_SECRET` đặt trên Vercel.
+- Ghi admin chuyển sang `/api/admin/db`; đã chạy `20250914_lock_public_writes.sql` trên production (anon INSERT bị RLS chặn, UPDATE không ảnh hưởng dòng nào).
+- Mật khẩu staff băm scrypt, giới hạn đăng nhập sai, khóa staff thu hồi quyền API ngay. Script `scripts/hash-staff-passwords.ts` băm các mật khẩu còn plaintext (chạy sau khi deploy).
+- Security headers trong `next.config.ts` (X-Frame-Options DENY, `frame-ancestors 'none'`, nosniff, Referrer-Policy, Permissions-Policy).
+- `/api/increment-views` không cộng lại trong 30 phút cho cùng IP + truyện (dựa `listener_logs`), không trả IP; `/api/affiliate-links/[id]/click` chặn click lặp 10 phút theo IP + link (bộ nhớ instance); preview chỉ nhận `https` host `shopee.vn`, `*.shopee.vn`, `shp.ee`.
 
 Còn lại:
 
-- RLS: policy production 2026-09-24 cho anon INSERT/UPDATE/DELETE trên `stories` và `ALL` trên `episodes`, `categories`, `affiliate_links`. Code admin đã chuyển sang `/api/admin/db`; cần chạy `20250914_lock_public_writes.sql` trên production (sau khi deploy code) để khóa ghi.
-- `staffs.password` lưu plaintext, login không giới hạn số lần thử, khóa staff không thu hồi session đang mở.
-- Thiếu security headers (chỉ có HSTS): cần `frame-ancestors`/`X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`.
-- `/api/increment-views`, `/api/affiliate-links/[id]/click` không chống spam; `increment-views` trả IP về client và cộng view kiểu read-modify-write.
-- `/api/affiliate-links/preview` lọc host bằng regex `(^|\.)shopee\.` (cho qua `shopee.<domain lạ>`).
-- Có dấu hiệu bot đăng ký; cần bật Confirm email + CAPTCHA trong Supabase Auth.
+- Cộng `real_views` vẫn là đọc-rồi-ghi (có thể mất lượt khi đồng thời); muốn chính xác cần hàm SQL tăng nguyên tử.
+- Chống bot đăng ký: bật Confirm email + CAPTCHA (Turnstile) trong Supabase Auth và gắn token vào form signup.
 
 ## Known limitations và kiểm thử
 

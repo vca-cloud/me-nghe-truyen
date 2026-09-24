@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { hasAdminSession } from "@/lib/admin-session"
+import { hasAdminSession } from "@/lib/admin-auth"
 import { syncAllAuthUsers } from "@/lib/sync-admin-user"
 
 export async function POST() {

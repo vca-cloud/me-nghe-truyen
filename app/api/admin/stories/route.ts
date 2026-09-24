@@ -1,14 +1,12 @@
-import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
 import { revalidatePath } from "next/cache"
 import { createClient } from "@supabase/supabase-js"
-import { ADMIN_SESSION_COOKIE, isValidAdminSession } from "@/lib/admin-session"
+import { hasAdminSession } from "@/lib/admin-auth"
 
 export const dynamic = "force-dynamic"
 
 export async function DELETE(request: Request) {
-  const session = (await cookies()).get(ADMIN_SESSION_COOKIE)?.value
-  if (!(await isValidAdminSession(session))) {
+  if (!(await hasAdminSession())) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 

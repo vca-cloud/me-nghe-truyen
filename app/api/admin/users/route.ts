@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { hasAdminSession } from "@/lib/admin-session"
+import { hasAdminSession } from "@/lib/admin-auth"
 import { createClient } from "@supabase/supabase-js"
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!

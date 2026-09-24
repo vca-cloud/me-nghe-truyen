@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { revalidatePath } from "next/cache"
 import { createClient } from "@supabase/supabase-js"
-import { hasAdminSession } from "@/lib/admin-session"
+import { hasAdminSession } from "@/lib/admin-auth"
 import { ADMIN_WRITABLE_TABLES, type AdminWriteRequest } from "@/lib/admin-db"
 
 type Match = Record<string, string | number | boolean>

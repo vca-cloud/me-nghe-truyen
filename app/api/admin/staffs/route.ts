@@ -1,19 +1,14 @@
-import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
-import { ADMIN_SESSION_COOKIE, isValidAdminSession } from "@/lib/admin-session"
+import { createServiceDb, hasAdminSession } from "@/lib/admin-auth"
+import { hashPassword } from "@/lib/password"
 
 export const dynamic = "force-dynamic"
 
 type StaffInput = { name?: unknown; email?: unknown; password?: unknown; locked?: unknown }
 
 async function getDb() {
-  const session = (await cookies()).get(ADMIN_SESSION_COOKIE)?.value
-  if (!(await isValidAdminSession(session))) return null
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!url || !key) throw new Error("Thiếu cấu hình Supabase server.")
-  return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } })
+  if (!(await hasAdminSession())) return null
+  return createServiceDb()
 }
 
 function publicStaff(staff: Record<string, unknown>) {
@@ -41,7 +36,7 @@ export async function POST(request: Request) {
     const email = String(body.email || "").trim().toLowerCase()
     const password = String(body.password || "").trim()
     if (!name || !email || !password) return NextResponse.json({ error: "Vui lòng nhập tên, email và mật khẩu." }, { status: 400 })
-    const { data, error } = await db.from("staffs").insert({ name, email, password }).select("id, name, email, locked").single()
+    const { data, error } = await db.from("staffs").insert({ name, email, password: await hashPassword(password) }).select("id, name, email, locked").single()
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })
     return NextResponse.json({ staff: data })
   } catch (error) {
@@ -59,7 +54,7 @@ export async function PUT(request: Request) {
     const email = String(body.email || "").trim().toLowerCase()
     if (!Number.isInteger(id) || id <= 0 || !name || !email) return NextResponse.json({ error: "Thông tin quản trị viên không hợp lệ." }, { status: 400 })
     const updates: StaffInput = { name, email }
-    if (String(body.password || "").trim()) updates.password = String(body.password).trim()
+    if (String(body.password || "").trim()) updates.password = await hashPassword(String(body.password).trim())
     if (typeof body.locked === "boolean") updates.locked = body.locked
     const { data, error } = await db.from("staffs").update(updates).eq("id", id).select("id, name, email, locked").single()
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })

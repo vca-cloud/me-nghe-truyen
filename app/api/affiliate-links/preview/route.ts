@@ -14,7 +14,9 @@ export async function GET(request: Request) {
 
   try {
     const parsed = new URL(url)
-    if (!/(^|\.)shopee\./i.test(parsed.hostname)) {
+    const host = parsed.hostname.toLowerCase()
+    const allowed = parsed.protocol === "https:" && (host === "shopee.vn" || host.endsWith(".shopee.vn") || host === "shp.ee")
+    if (!allowed) {
       return NextResponse.json({ error: "Chỉ hỗ trợ URL Shopee" }, { status: 400 })
     }
 

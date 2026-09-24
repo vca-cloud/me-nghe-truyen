@@ -1,15 +1,12 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
+import { clientIp } from "@/lib/request-ip"
 
-function errorMessage(error: unknown) {
-  if (error instanceof Error) return error.message
-  if (error && typeof error === "object" && "message" in error) return String((error as { message?: unknown }).message)
-  return "Không thể cập nhật lượt nghe"
-}
+const DEDUPE_WINDOW_MS = 30 * 60 * 1000
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json()
+    const body = await request.json().catch(() => null)
     const storyId = Number(body?.storyId)
     if (!Number.isInteger(storyId) || storyId <= 0) {
       return NextResponse.json({ error: "storyId không hợp lệ" }, { status: 400 })
@@ -25,29 +22,24 @@ export async function POST(request: Request) {
       auth: { autoRefreshToken: false, persistSession: false },
     })
 
-    // Lấy IP từ request
-    const ip = request.headers.get("x-forwarded-for") || request.headers.get("x-real-ip") || "unknown"
-    const userAgent = request.headers.get("user-agent") || "unknown"
+    const ip = clientIp(request)
+    const since = new Date(Date.now() - DEDUPE_WINDOW_MS).toISOString()
+    const { count } = await db
+      .from("listener_logs")
+      .select("id", { count: "exact", head: true })
+      .eq("ip_address", ip)
+      .eq("story_id", storyId)
+      .gte("created_at", since)
+    if (count && count > 0) return NextResponse.json({ ok: true, counted: false })
 
-    // Lưu log lượt nghe
-    await db.from("listener_logs").insert({
-      ip_address: ip,
-      story_id: storyId,
-      created_at: new Date().toISOString()
-    })
+    const { data: story, error: storyError } = await db.from("stories").select("real_views").eq("id", storyId).maybeSingle()
+    if (storyError || !story) return NextResponse.json({ error: "Không tìm thấy truyện" }, { status: 404 })
 
-    // Cập nhật real_views
-    const modern = await db.from("stories").select("real_views").eq("id", storyId).single()
-    if (!modern.error) {
-      await db.from("stories").update({ real_views: Number(modern.data?.real_views || 0) + 1 }).eq("id", storyId)
-      return NextResponse.json({ ok: true, field: "real_views", ip })
-    }
-
-    // Compatibility cho DB cũ
-    const legacy = await db.from("stories").select("plays").eq("id", storyId).single()
-    await db.from("stories").update({ plays: String(Number(legacy.data?.plays || 0) + 1) }).eq("id", storyId)
-    return NextResponse.json({ ok: true, field: "plays", migrationRequired: true, ip })
+    await db.from("listener_logs").insert({ ip_address: ip, story_id: storyId, created_at: new Date().toISOString() })
+    await db.from("stories").update({ real_views: Number(story.real_views || 0) + 1 }).eq("id", storyId)
+    return NextResponse.json({ ok: true, counted: true })
   } catch (error) {
-    return NextResponse.json({ error: errorMessage(error) }, { status: 500 })
+    console.error("increment-views:", error instanceof Error ? error.message : error)
+    return NextResponse.json({ error: "Không thể cập nhật lượt nghe" }, { status: 500 })
   }
 }
