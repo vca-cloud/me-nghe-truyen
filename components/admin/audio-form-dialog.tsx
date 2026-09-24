@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
+import { adminWrite } from "@/lib/admin-db"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -9,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { toast } from "sonner"
 import { Check, Loader2, Plus, Trash2 } from "lucide-react"
-import { supabase, type Episode } from "@/lib/supabase"
+import type { Episode } from "@/lib/supabase"
 import { getCategoryOptions } from "@/lib/category-options"
 import {
   formatEpisodeDuration,
@@ -161,8 +162,8 @@ export function AudioFormDialog({ story = null, open: controlledOpen, onOpenChan
 
     try {
       const { data: storyData, error } = isEditing
-        ? await supabase.from("stories").update(payload).eq("id", story!.id!).select()
-        : await supabase.from("stories").insert([{ ...payload, plays: "0" }]).select()
+        ? await adminWrite<{ id: number }[]>({ table: "stories", op: "update", values: payload, match: { id: story!.id! }, select: true })
+        : await adminWrite<{ id: number }[]>({ table: "stories", op: "insert", values: [{ ...payload, plays: "0" }], select: true })
 
       if (error && /text_url/i.test(error.message)) {
         toast.error("Chưa có cột text_url trên Supabase. Chạy SQL trong tab SQL Editor:\n\nALTER TABLE public.stories ADD COLUMN IF NOT EXISTS text_url TEXT;")
@@ -171,7 +172,7 @@ export function AudioFormDialog({ story = null, open: controlledOpen, onOpenChan
       const storyId = isEditing ? story!.id! : storyData?.[0]?.id
       if (!storyId) throw new Error("Không lấy được ID bộ truyện.")
 
-      const { error: deleteError } = await supabase.from("episodes").delete().eq("story_id", storyId)
+      const { error: deleteError } = await adminWrite({ table: "episodes", op: "delete", match: { story_id: storyId } })
       if (deleteError) throw deleteError
       const records = resolvedEpisodes.map((episode, index) => {
         const seconds = parseDurationSeconds(episode.duration)
@@ -183,7 +184,7 @@ export function AudioFormDialog({ story = null, open: controlledOpen, onOpenChan
           duration: episode.duration.trim(),
         }
       })
-      const { error: episodeError } = await supabase.from("episodes").insert(records)
+      const { error: episodeError } = await adminWrite({ table: "episodes", op: "insert", values: records })
       if (episodeError) throw episodeError
 
       toast.success(isEditing ? "Cập nhật truyện thành công!" : "Thêm truyện thành công!")

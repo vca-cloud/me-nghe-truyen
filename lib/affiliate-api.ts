@@ -1,3 +1,4 @@
+import { adminWrite } from "@/lib/admin-db"
 import { supabase } from "@/lib/supabase"
 
 export interface AffiliateLink {
@@ -24,18 +25,18 @@ export async function getAffiliateLinks() {
 }
 
 export async function createAffiliateLink(payload: AffiliateLinkPayload) {
-  const result = await supabase.from("affiliate_links").insert(payload).select().single()
+  const result = await adminWrite<AffiliateLink[]>({ table: "affiliate_links", op: "insert", values: { ...payload }, select: true })
   throwSupabaseError(result.error)
-  return result.data as AffiliateLink
+  return result.data?.[0] as AffiliateLink
 }
 
 export async function updateAffiliateLink(id: number, payload: AffiliateLinkPayload) {
-  const result = await supabase.from("affiliate_links").update({ ...payload, updated_at: new Date().toISOString() }).eq("id", id).select().single()
+  const result = await adminWrite<AffiliateLink[]>({ table: "affiliate_links", op: "update", values: { ...payload, updated_at: new Date().toISOString() }, match: { id }, select: true })
   throwSupabaseError(result.error)
-  return result.data as AffiliateLink
+  return result.data?.[0] as AffiliateLink
 }
 
 export async function deleteAffiliateLink(id: number) {
-  const result = await supabase.from("affiliate_links").delete().eq("id", id)
+  const result = await adminWrite({ table: "affiliate_links", op: "delete", match: { id } })
   throwSupabaseError(result.error)
 }

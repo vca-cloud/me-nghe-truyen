@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { adminWrite } from "@/lib/admin-db"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -90,19 +91,19 @@ export function ImportStoriesDialog({ onSuccess }: Props) {
 
         let storyId: number
         if (existing) {
-          const { error } = await supabase.from("stories").update(payload).eq("id", existing.id)
+          const { error } = await adminWrite({ table: "stories", op: "update", values: payload, match: { id: existing.id } })
           if (error) throw error
           storyId = existing.id
           updated++
         } else {
-          const { data, error } = await supabase.from("stories").insert([{ ...payload, plays: "0", base_fake_views: initialFakeViews, real_views: 0 }]).select("id")
+          const { data, error } = await adminWrite<{ id: number }[]>({ table: "stories", op: "insert", values: [{ ...payload, plays: "0", base_fake_views: initialFakeViews, real_views: 0 }], select: true })
           if (error) throw error
           storyId = Number(data?.[0]?.id)
           if (!storyId) throw new Error("Không lấy được ID truyện")
           success++
         }
 
-        const { error: deleteError } = await supabase.from("episodes").delete().eq("story_id", storyId)
+        const { error: deleteError } = await adminWrite({ table: "episodes", op: "delete", match: { story_id: storyId } })
         if (deleteError) throw deleteError
         const episodeRows = story.episodes.map((episode, episodeIndex) => ({
           story_id: storyId,
@@ -111,7 +112,7 @@ export function ImportStoriesDialog({ onSuccess }: Props) {
           audio_url: episode.audio_url,
           duration: formatClockDuration(parseDurationSeconds(episode.duration)),
         }))
-        const episodeResult = await supabase.from("episodes").insert(episodeRows)
+        const episodeResult = await adminWrite({ table: "episodes", op: "insert", values: episodeRows })
         if (episodeResult.error) throw episodeResult.error
 
         for (const key of keys) existingByKey.set(key, { id: storyId, title: story.title })

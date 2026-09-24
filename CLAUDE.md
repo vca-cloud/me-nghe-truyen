@@ -167,7 +167,7 @@ Không gọi API ở mọi `timeupdate`. Guest chưa có đồng bộ tiến đ�
 
 ## Admin
 
-Admin đăng nhập riêng tại `/admin/login`; trang `/admin/*` được middleware bảo vệ bằng cookie `admin_session`. Thao tác ghi truyện/tập/import/thể loại/affiliate chạy **phía client bằng anon key** (`lib/supabase.ts`) và dựa vào RLS mở — xem **Nợ bảo mật**. Các module hiện có:
+Admin đăng nhập riêng tại `/admin/login`; trang `/admin/*` được middleware bảo vệ bằng cookie `admin_session`. Mọi thao tác ghi truyện/tập/import/thể loại/affiliate đi qua `adminWrite()` (`lib/admin-db.ts`) → `POST /api/admin/db` (kiểm tra `hasAdminSession()`, chỉ cho 4 bảng `ADMIN_WRITABLE_TABLES`, update/delete bắt buộc có `match`, dùng service role). Không ghi bằng anon client ở UI admin; client chỉ đọc. Các module hiện có:
 
 | Route | Chức năng |
 | --- | --- |
@@ -207,6 +207,7 @@ Chạy theo thứ tự các file trong `supabase/migrations/`:
 - `20250911_lock_staffs_rls.sql`
 - `20250912_add_story_text_url.sql`
 - `20250913_create_member_account_tables.sql`
+- `20250914_lock_public_writes.sql` — anon/authenticated chỉ SELECT trên stories/episodes/categories/affiliate_links
 
 Migration member tạo `favorites` (khóa ghép user/story) và `listening_history` (FK story/episode, progress, duration, completed, timestamp), index và RLS. Khi sửa unique/upsert cho row story-level có `episode_id NULL`, phải lưu ý PostgreSQL unique index cho phép nhiều NULL và cần thiết kế khóa/constraint phù hợp.
 
@@ -216,7 +217,7 @@ Migration member tạo `favorites` (khóa ghép user/story) và `listening_histo
 
 Còn lại:
 
-- RLS: theo migration, `stories`, `episodes`, `categories`, `admin_users`, `affiliate_links` có policy `FOR ALL TO anon, authenticated USING (true) WITH CHECK (true)` và admin UI ghi trực tiếp bằng anon key. Production đã khác migration (anon không đọc được `admin_users`, 2026-09-24) — phải lấy policy thật trước khi viết migration. Hướng sửa: chuyển ghi admin sang API server có `hasAdminSession()` + service role, rồi thu hẹp anon về SELECT.
+- RLS: policy production 2026-09-24 cho anon INSERT/UPDATE/DELETE trên `stories` và `ALL` trên `episodes`, `categories`, `affiliate_links`. Code admin đã chuyển sang `/api/admin/db`; cần chạy `20250914_lock_public_writes.sql` trên production (sau khi deploy code) để khóa ghi.
 - `staffs.password` lưu plaintext, login không giới hạn số lần thử, khóa staff không thu hồi session đang mở.
 - Thiếu security headers (chỉ có HSTS): cần `frame-ancestors`/`X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`.
 - `/api/increment-views`, `/api/affiliate-links/[id]/click` không chống spam; `increment-views` trả IP về client và cộng view kiểu read-modify-write.

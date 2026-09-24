@@ -36,18 +36,3 @@ export async function getEpisodes(storyId: number) {
 
   return { data: (data ?? []) as Episode[], error }
 }
-
-export async function incrementStoryPlays(storyId: number) {
-  const { data: story } = await supabase
-    .from("stories")
-    .select("real_views")
-    .eq("id", storyId)
-    .single()
-
-  const currentRealViews = Number(story?.real_views || 0)
-
-  return supabase
-    .from("stories")
-    .update({ real_views: currentRealViews + 1 })
-    .eq("id", storyId)
-}
