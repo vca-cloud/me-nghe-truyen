@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { formatDateVN } from "@/lib/utils"
 import { Edit, Lock, Unlock, Plus, Trash2 } from "lucide-react"
 import { AdminShell } from "@/components/admin/admin-shell"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -11,7 +12,7 @@ import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { toast } from "sonner"
 
-type Staff = { id: number; name: string; email: string; locked: boolean }
+type Staff = { id: number; name: string; email: string; locked: boolean; created_at?: string }
 export default function StaffsPage() {
   const [staffs, setStaffs] = useState<Staff[]>([])
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -109,6 +110,7 @@ export default function StaffsPage() {
             <TableRow>
               <TableHead>Tên Admin</TableHead>
               <TableHead>Email</TableHead>
+              <TableHead>Ngày tạo</TableHead>
               <TableHead>Trạng thái</TableHead>
               <TableHead>Hành động</TableHead>
             </TableRow>
@@ -118,6 +120,7 @@ export default function StaffsPage() {
               <TableRow key={staff.id}>
                 <TableCell>{staff.name}</TableCell>
                 <TableCell>{staff.email}</TableCell>
+                <TableCell>{formatDateVN(staff.created_at)}</TableCell>
                 <TableCell>
                   <Badge variant={staff.locked ? "secondary" : "default"}>
                     {staff.locked ? "Khóa" : "Hoạt động"}

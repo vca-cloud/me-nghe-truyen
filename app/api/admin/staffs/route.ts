@@ -12,14 +12,14 @@ async function getDb() {
 }
 
 function publicStaff(staff: Record<string, unknown>) {
-  return { id: staff.id, name: staff.name, email: staff.email, locked: staff.locked }
+  return { id: staff.id, name: staff.name, email: staff.email, locked: staff.locked, created_at: staff.created_at }
 }
 
 export async function GET() {
   try {
     const db = await getDb()
     if (!db) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    const { data, error } = await db.from("staffs").select("id, name, email, locked").order("id")
+    const { data, error } = await db.from("staffs").select("id, name, email, locked, created_at").order("id")
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     return NextResponse.json({ staffs: (data || []).map(publicStaff) })
   } catch (error) {
@@ -36,7 +36,7 @@ export async function POST(request: Request) {
     const email = String(body.email || "").trim().toLowerCase()
     const password = String(body.password || "").trim()
     if (!name || !email || !password) return NextResponse.json({ error: "Vui lòng nhập tên, email và mật khẩu." }, { status: 400 })
-    const { data, error } = await db.from("staffs").insert({ name, email, password: await hashPassword(password) }).select("id, name, email, locked").single()
+    const { data, error } = await db.from("staffs").insert({ name, email, password: await hashPassword(password) }).select("id, name, email, locked, created_at").single()
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })
     return NextResponse.json({ staff: data })
   } catch (error) {
@@ -56,7 +56,7 @@ export async function PUT(request: Request) {
     const updates: StaffInput = { name, email }
     if (String(body.password || "").trim()) updates.password = await hashPassword(String(body.password).trim())
     if (typeof body.locked === "boolean") updates.locked = body.locked
-    const { data, error } = await db.from("staffs").update(updates).eq("id", id).select("id, name, email, locked").single()
+    const { data, error } = await db.from("staffs").update(updates).eq("id", id).select("id, name, email, locked, created_at").single()
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })
     return NextResponse.json({ staff: data })
   } catch (error) {

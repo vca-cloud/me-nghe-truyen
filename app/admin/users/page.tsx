@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { formatDateVN } from "@/lib/utils"
 import { Eye, Lock, Unlock, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react"
 import { AdminShell } from "@/components/admin/admin-shell"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -235,7 +236,7 @@ export default function UsersPage() {
                   </TableCell>
                   <TableCell>{user.name}</TableCell>
                   <TableCell>{user.email}</TableCell>
-                  <TableCell>{user.register}</TableCell>
+                  <TableCell>{formatDateVN(user.register)}</TableCell>
                   <TableCell>{user.plays}</TableCell>
                   <TableCell>
                     <Badge variant={user.package === "VIP" ? "default" : "outline"}>{user.package}</Badge>
