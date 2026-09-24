@@ -35,7 +35,7 @@ export async function PUT(request: Request) {
   }
   const safeProgress = duration > 0 ? Math.min(progress, duration) : progress
   const completed = Boolean(body?.completed) || (duration > 0 && safeProgress >= duration * 0.9)
-  let query = supabase.from("listening_history").upsert({
+  const query = supabase.from("listening_history").upsert({
     user_id: user.id, story_id: storyId, episode_id: episodeId,
     progress_seconds: safeProgress, duration_seconds: duration, completed,
     last_played_at: new Date().toISOString(),

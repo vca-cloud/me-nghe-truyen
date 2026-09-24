@@ -25,9 +25,9 @@ export async function GET() {
     }
 
     return NextResponse.json({ users: data || [] })
-  } catch (err: any) {
-    console.error("Lỗi fetch admin_users:", err.message)
-    return NextResponse.json({ error: err.message }, { status: 500 })
+  } catch (err) {
+    console.error("Lỗi fetch admin_users:", (err instanceof Error ? err.message : String(err)))
+    return NextResponse.json({ error: (err instanceof Error ? err.message : String(err)) }, { status: 500 })
   }
 }
 
@@ -66,7 +66,7 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({ user: data?.[0] })
-  } catch (err: any) {
+  } catch (err) {
     console.error("Lỗi POST /api/admin/users:", err)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
@@ -107,7 +107,7 @@ export async function PUT(request: Request) {
     }
 
     return NextResponse.json({ user: data?.[0] })
-  } catch (err: any) {
+  } catch (err) {
     console.error("Lỗi PUT /api/admin/users:", err)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
@@ -140,7 +140,7 @@ export async function DELETE(request: Request) {
     }
 
     return NextResponse.json({ success: true })
-  } catch (err: any) {
+  } catch (err) {
     console.error("Lỗi DELETE /api/admin/users:", err)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }

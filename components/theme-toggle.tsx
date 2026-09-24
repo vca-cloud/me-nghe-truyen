@@ -1,33 +1,35 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useSyncExternalStore } from "react"
 import { Button } from "@/components/ui/button"
 import { Moon, Sun } from "lucide-react"
 
+type Theme = "light" | "dark"
+
+function subscribe(onChange: () => void) {
+  const observer = new MutationObserver(onChange)
+  observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] })
+  return () => observer.disconnect()
+}
+
+const readTheme = (): Theme => (document.documentElement.classList.contains("dark") ? "dark" : "light")
+
 export function ThemeToggle() {
-  const [theme, setTheme] = useState<"light" | "dark">("light")
-  const [mounted, setMounted] = useState(false)
+  const theme = useSyncExternalStore<Theme | null>(subscribe, readTheme, () => null)
 
   useEffect(() => {
-    setMounted(true)
     const stored = localStorage.getItem("theme")
-    if (stored === "dark" || stored === "light") {
-      setTheme(stored)
-      document.documentElement.classList.toggle("dark", stored === "dark")
-    } else if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
-      setTheme("dark")
-      document.documentElement.classList.add("dark")
-    }
+    const dark = stored === "dark" || (stored !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches)
+    document.documentElement.classList.toggle("dark", dark)
   }, [])
 
   const toggle = () => {
-    const next = theme === "light" ? "dark" : "light"
-    setTheme(next)
+    const next: Theme = theme === "dark" ? "light" : "dark"
     document.documentElement.classList.toggle("dark", next === "dark")
     localStorage.setItem("theme", next)
   }
 
-  if (!mounted) {
+  if (!theme) {
     return <Button variant="ghost" size="icon" aria-label="Đổi giao diện"><Sun className="h-4 w-4" /></Button>
   }
 

@@ -25,6 +25,13 @@ type User = {
   created_at?: string;
 }
 
+async function fetchUsers(): Promise<User[]> {
+  const response = await fetch("/api/admin/users", { cache: "no-store" })
+  const result = await response.json()
+  if (!response.ok) throw new Error(result.error || "Không tải được danh sách thành viên")
+  return result.users || []
+}
+
 export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
@@ -34,25 +41,14 @@ export default function UsersPage() {
   const [submitting, setSubmitting] = useState(false)
   const [syncing, setSyncing] = useState(false)
 
-  const load = async () => {
+  const load = () => fetchUsers()
+    .then(setUsers)
+    .catch((error) => toast.error(error instanceof Error ? error.message : "Lỗi tải thành viên"))
+    .finally(() => setLoading(false))
+
+  const reload = () => {
     setLoading(true)
-    try {
-      const response = await fetch("/api/admin/users", { cache: "no-store" })
-      const result = await response.json()
-
-      if (!response.ok) {
-        console.error("API Error:", result.error)
-        throw new Error(result.error || "Không tải được danh sách thành viên")
-      }
-
-      console.log("Users loaded:", result.users)
-      setUsers(result.users || [])
-    } catch (error) {
-      console.error("Lỗi tải thành viên:", error)
-      toast.error(error instanceof Error ? error.message : "Lỗi tải thành viên")
-    } finally {
-      setLoading(false)
-    }
+    return load()
   }
 
   useEffect(() => {
@@ -66,7 +62,7 @@ export default function UsersPage() {
       const result = await response.json()
       if (!response.ok) throw new Error(result.error || "Không đồng bộ được thành viên")
       toast.success(`Đã đồng bộ ${result.count || 0} thành viên từ Auth`)
-      await load()
+      await reload()
     } catch (error) {
       console.error("Lỗi đồng bộ Auth:", error)
       toast.error(error instanceof Error ? error.message : "Lỗi đồng bộ Auth")
@@ -100,7 +96,7 @@ export default function UsersPage() {
       toast.success("Đã thêm thành viên mới")
       setOpen(false)
       setForm({ name: "", email: "", package: "Free" })
-      await load()
+      await reload()
     } catch (error) {
       console.error("Lỗi thêm user:", error)
       toast.error(error instanceof Error ? error.message : "Lỗi thêm thành viên")
@@ -131,7 +127,7 @@ export default function UsersPage() {
       toast.success("Đã cập nhật thành viên")
       setOpen(false)
       setEditing(null)
-      await load()
+      await reload()
     } catch (error) {
       console.error("Lỗi sửa user:", error)
       toast.error(error instanceof Error ? error.message : "Lỗi sửa thành viên")
@@ -161,7 +157,7 @@ export default function UsersPage() {
         throw new Error(result.error || "Lỗi toggle locked")
       }
 
-      await load()
+      await reload()
     } catch (error) {
       console.error("Lỗi toggle locked:", error)
       toast.error(error instanceof Error ? error.message : "Lỗi toggle locked")
@@ -182,7 +178,7 @@ export default function UsersPage() {
       }
 
       toast.success("Đã xóa thành viên")
-      await load()
+      await reload()
     } catch (error) {
       console.error("Lỗi xóa user:", error)
       toast.error(error instanceof Error ? error.message : "Lỗi xóa thành viên")

@@ -12,7 +12,7 @@
 - Khi sửa schema Supabase, tạo/cập nhật migration trong `supabase/migrations/` và chạy trên đúng project trước khi kiểm thử production.
 - Không gọi một thay đổi local là đã push GitHub/deploy Vercel nếu chưa thấy lệnh tương ứng thành công.
 - Khi đề cập code trong tài liệu hoặc review, dùng đường dẫn file tương đối và xác minh file còn tồn tại.
-- Route admin mới (`/api/admin/*`, `/api/backup`) phải gọi `hasAdminSession()` từ `lib/admin-auth.ts` ở đầu mỗi handler (kiểm tra chữ ký cookie + staff còn tồn tại và không bị khóa); middleware chỉ kiểm tra chữ ký và không bảo vệ API. Mật khẩu staff băm scrypt qua `lib/password.ts`; login tự băm lại mật khẩu cũ dạng plaintext và khóa 15 phút sau 5 lần sai (theo IP và email, bộ đếm trong bộ nhớ instance). Session ký bằng `ADMIN_SESSION_SECRET` (đã đặt trên Vercel), hết hạn sau 7 ngày theo `issuedAt`.
+- Route admin mới (`/api/admin/*`, `/api/backup`) phải gọi `hasAdminSession()` từ `lib/admin-auth.ts` ở đầu mỗi handler (kiểm tra chữ ký cookie + staff còn tồn tại và không bị khóa); `proxy.ts` chỉ kiểm tra chữ ký và không bảo vệ API. Mật khẩu staff băm scrypt qua `lib/password.ts`; login tự băm lại mật khẩu cũ dạng plaintext và khóa 15 phút sau 5 lần sai (theo IP và email, bộ đếm trong bộ nhớ instance). Session ký bằng `ADMIN_SESSION_SECRET` (đã đặt trên Vercel), hết hạn sau 7 ngày theo `issuedAt`.
 - Tham số `next` sau đăng nhập luôn đi qua `getSafeNextPath` (`lib/site-url.ts`), chặn `//`, `\` và ký tự điều khiển.
 
 ## Lệnh và công nghệ
@@ -59,6 +59,8 @@ app/
 ├── track/[slug]/page.tsx            # Track theo slugify(title), fallback ID; ISR 60s; không tìm thấy → redirect("/")
 ├── [...slug]/page.tsx               # URL không khớp route nào → redirect 307 về "/"
 ├── not-found.tsx                    # notFound() còn lại → redirect về "/"
+├── sitemap.ts, robots.ts            # /sitemap.xml (trang tĩnh + mọi track), /robots.txt (chặn /admin, /api/, /account, /auth/)
+├── opengraph-image.tsx              # ảnh chia sẻ mặc định; track/[slug]/opengraph-image.tsx vẽ ảnh theo truyện (lib/og-card.tsx, font assets/fonts/BeVietnamPro-Bold.ttf, OFL)
 ├── admin/{login,analytics,audio,affiliate,users,staffs,categories,settings}/
 └── api/
     ├── home-stories/route.ts
@@ -74,7 +76,7 @@ app/
     └── backup/route.ts
 
 components/
-├── header.tsx, footer.tsx, audio-card.tsx, info-page.tsx, home-page.tsx
+├── header.tsx, footer.tsx, audio-card.tsx, info-page.tsx, home-page.tsx, continue-listening.tsx
 ├── login-form.tsx, signup-form.tsx, theme-toggle.tsx
 ├── AffiliateModal.tsx, image-with-fallback.tsx
 ├── account/account-page.tsx
@@ -86,12 +88,14 @@ components/
 lib/
 ├── supabase.ts, supabase-client.ts, supabase-server.ts
 ├── admin-session.ts, sync-admin-user.ts, site-url.ts
-├── story-views.ts, duration.ts, import-stories.ts, home-stories.ts
+├── story-views.ts, duration.ts, import-stories.ts, home-stories.ts, track-data.ts
+├── admin-auth.ts, admin-db.ts, password.ts, request-ip.ts, signup-validation.ts
+├── analytics.ts (trackEvent → gtag), local-progress.ts (tiến độ guest trong localStorage), og-card.tsx
 ├── affiliate-api.ts, category-data.ts, category-options.ts, categories.ts
 ├── slug.ts, utils.ts
-└── social-proof.ts, audio-api.ts      # hiện không được import ở đâu
+└── social-proof.ts                   # hiện không được import ở đâu
 
-middleware.ts                          # chỉ bảo vệ trang /admin/*, trừ /admin/login; KHÔNG bảo vệ /api/*
+proxy.ts                               # (Next 16, thay middleware) chỉ bảo vệ trang /admin/*, trừ /admin/login; KHÔNG bảo vệ /api/*
 scripts/lock-staffs-rls.mjs            # script khóa RLS staff bằng service role
 ```
 
@@ -140,7 +144,7 @@ Khi đổi domain, cập nhật một lần trong Vercel Environment Variables v
 
 `app/track/[slug]/page.tsx` hiển thị thông tin truyện, total views, thể loại, link **Đọc truyện chữ**, player và danh sách tập. `text_url` được dùng khi có giá trị; khi trống, link đọc fallback về track hiện tại. URL track tạo từ `slugify(title)` hoặc ID vì production có thể không có cột `stories.slug`.
 
-Trang track là ISR on-demand (`revalidate = 60` + `generateStaticParams` trả `[]`): lần đầu render rồi cache. Dữ liệu lấy 2 bước: (1) danh sách nhẹ `LIST_COLUMNS` để tìm story theo ID/slug và tính trước/sau/liên quan, (2) song song `select("*")` story + `getEpisodes`. Không `select("*")` toàn bảng, không đọc cookies/session trong page (sẽ phá ISR); dữ liệu theo user nằm ở client component. Lượt nghe trên trang có thể trễ tối đa 60s.
+Trang track là ISR (`revalidate = 60`); `generateStaticParams` build sẵn 12 truyện nhiều view nhất, truyện khác render lần đầu rồi cache. `lib/track-data.ts` (`getTrackData`, bọc React `cache`) dùng chung cho page, `generateMetadata` và `opengraph-image`. Metadata track: title, description (từ mô tả), canonical, OG/Twitter, JSON-LD `AudioObject`. Layout đặt `metadataBase` = `getSiteUrl()` và title template `%s | mê nghe truyện` — page con chỉ đặt phần tên trang. Dữ liệu lấy 2 bước: (1) danh sách nhẹ `LIST_COLUMNS` để tìm story theo ID/slug và tính trước/sau/liên quan, (2) song song `select("*")` story + `getEpisodes`. Không `select("*")` toàn bảng, không đọc cookies/session trong page (sẽ phá ISR); dữ liệu theo user nằm ở client component. Lượt nghe trên trang có thể trễ tối đa 60s.
 
 Ảnh bìa dùng `ImageWithFallback`: URL thuộc host `NEXT_PUBLIC_R2_PUBLIC_URL` đi qua `next/image` (khai báo `images.remotePatterns` trong `next.config.ts`), host khác dùng `<img loading="lazy">` để không vỡ ảnh dán thủ công.
 
@@ -153,7 +157,7 @@ Trang track là ISR on-demand (`revalidate = 60` + `generateStaticParams` trả 
 - ghi một row khi bắt đầu phát, cập nhật thưa khi đang nghe và flush khi pause;
 - ghi completed khi audio kết thúc hoặc đạt ngưỡng code quy định.
 
-Không gọi API ở mọi `timeupdate`. Guest chưa có đồng bộ tiến độ server; nếu bổ sung local progress/merge sau login phải giữ key ổn định theo story/episode.
+Không gọi API ở mọi `timeupdate`. Mọi lần lưu tiến độ cũng ghi `localStorage` (`mnt-progress:<storyId>:<episodeId|0>`); khi không có row server (guest) player khôi phục từ đó. Player còn có Media Session API (điều khiển màn hình khóa/tai nghe), hẹn giờ tắt (15/30/60 phút hoặc hết tập) và gửi GA event `audio_play`, `audio_complete`, `sleep_timer_set`; `AffiliateModal` gửi `affiliate_click`. Trang chủ có mục **Nghe tiếp** (`components/continue-listening.tsx`) cho user đăng nhập, lấy từ `/api/listening-history`.
 
 ## Account member
 
@@ -167,7 +171,7 @@ Không gọi API ở mọi `timeupdate`. Guest chưa có đồng bộ tiến đ�
 
 ## Admin
 
-Admin đăng nhập riêng tại `/admin/login`; trang `/admin/*` được middleware bảo vệ bằng cookie `admin_session`. Mọi thao tác ghi truyện/tập/import/thể loại/affiliate đi qua `adminWrite()` (`lib/admin-db.ts`) → `POST /api/admin/db` (kiểm tra `hasAdminSession()`, chỉ cho 4 bảng `ADMIN_WRITABLE_TABLES`, update/delete bắt buộc có `match`, dùng service role). Không ghi bằng anon client ở UI admin; client chỉ đọc. Các module hiện có:
+Admin đăng nhập riêng tại `/admin/login`; trang `/admin/*` được `proxy.ts` bảo vệ bằng cookie `admin_session`. Mọi thao tác ghi truyện/tập/import/thể loại/affiliate đi qua `adminWrite()` (`lib/admin-db.ts`) → `POST /api/admin/db` (kiểm tra `hasAdminSession()`, chỉ cho 4 bảng `ADMIN_WRITABLE_TABLES`, update/delete bắt buộc có `match`, dùng service role). Không ghi bằng anon client ở UI admin; client chỉ đọc. Các module hiện có:
 
 | Route | Chức năng |
 | --- | --- |
@@ -229,8 +233,7 @@ Còn lại:
 ## Known limitations và kiểm thử
 
 - Audio/cover hiện dán URL công khai, chưa upload trực tiếp lên R2 từ form.
-- Playlist, hẹn giờ, shuffle và merge local progress guest sau login chưa có nghiệp vụ.
+- Playlist, shuffle, tự chuyển tập trong cùng truyện và merge local progress guest lên server sau login chưa có.
 - Social proof không phản ánh người nghe realtime.
 - Cần kiểm thử guest redirect, favorite add/remove, history ngay khi Play, restore progress, nhiều episode và RLS isolation giữa hai user trên Supabase thật.
-- Trước khi hoàn tất thay đổi chạy `npm run build`, `npm run lint` và `git diff --check`. `npm run lint` toàn repo hiện có sẵn 18 lỗi cũ (chủ yếu admin, `app/page.tsx`, `header.tsx`, `theme-toggle.tsx`); tối thiểu phải `npx eslint <file đã sửa>` sạch và không tăng số lỗi.
-- Next.js 16 có cảnh báo convention `middleware` deprecated, đề xuất `proxy`; chỉ chuyển khi có task riêng và kiểm tra lại middleware bảo vệ admin.
+- Trước khi hoàn tất thay đổi chạy `npm run build`, `npm run lint` và `git diff --check`. `npm run lint` toàn repo phải 0 error (đạt 2026-09-24; còn warning cũ). Với react-hooks `set-state-in-effect`: tải dữ liệu lúc mount bằng hàm fetch thuần + `.then(setState)`, reset state theo prop bằng điều chỉnh trong render.

@@ -17,60 +17,59 @@ import { Card, CardContent } from "@/components/ui/card"
 import { TrackExperience } from "@/components/track/track-experience"
 import { TrackActions } from "@/components/track/track-actions"
 import { ImageWithFallback } from "@/components/image-with-fallback"
-import { getEpisodes, supabase } from "@/lib/supabase"
-import { slugify } from "@/lib/slug"
+import type { Metadata } from "next"
 import { totalViewsFor } from "@/lib/story-views"
+import { getTrackData, plainDescription, storyPath } from "@/lib/track-data"
+import { supabase } from "@/lib/supabase"
+import { getSiteUrl } from "@/lib/site-url"
 
-interface Story {
-  id: number
-  slug?: string | null
-  title: string
-  author: string | null
-  genre: string | null
-  description: string | null
-  audio_url: string | null
-  cover_url: string | null
-  text_url?: string | null
-  episodes: number | null
-  duration: string | null
-  plays: string | null
-  real_views?: number | null
-  base_fake_views?: number | null
-  status: string | null
-}
+type TrackParams = { params: Promise<{ slug?: string; id?: string }> }
 
-function storyPath(story: Pick<Story, "title">) {
-  return slugify(story.title)
+async function paramValueOf(params: TrackParams["params"]) {
+  const routeParams = await params
+  return decodeURIComponent(routeParams.slug || routeParams.id || "")
 }
 
 export const revalidate = 60
 
-export function generateStaticParams() {
-  return []
+// Tạo sẵn các truyện được nghe nhiều nhất lúc build; truyện khác render lần đầu rồi cache.
+export async function generateStaticParams() {
+  const { data } = await supabase.from("stories").select("title, real_views, base_fake_views, plays")
+  return (data ?? [])
+    .map((story) => ({ story, views: totalViewsFor(story) }))
+    .sort((a, b) => b.views - a.views)
+    .slice(0, 12)
+    .map(({ story }) => ({ slug: storyPath({ title: story.title, id: 0 }) }))
+    .filter((item) => item.slug && item.slug !== "0")
 }
 
-const LIST_COLUMNS = "id, title, genre, episodes, description, cover_url"
+export async function generateMetadata({ params }: TrackParams): Promise<Metadata> {
+  const data = await getTrackData(await paramValueOf(params))
+  if (!data) return { title: "Không tìm thấy truyện", robots: { index: false } }
+  const { story } = data
+  const path = `/track/${storyPath(story)}`
+  const description = plainDescription(story)
+  const title = `${story.title} - Nghe audio truyện`
+  return {
+    title,
+    description,
+    alternates: { canonical: path },
+    openGraph: {
+      type: "music.album",
+      url: path,
+      title,
+      description,
+      siteName: "mê nghe truyện",
+      locale: "vi_VN",
+    },
+    twitter: { card: "summary_large_image", title, description },
+  }
+}
 
-export default async function TrackPage({ params }: { params: Promise<{ slug?: string; id?: string }> }) {
-  const routeParams = await params
-  const paramValue = decodeURIComponent(routeParams.slug || routeParams.id || "")
-
-  const { data: listData } = await supabase.from("stories").select(LIST_COLUMNS).order("id", { ascending: true })
-  const allStories = (listData ?? []) as Story[]
-
-  // Không query cột slug vì production có thể không có cột này.
-  const numericId = Number(paramValue)
-  const listed =
-    (Number.isInteger(numericId) && numericId > 0 ? allStories.find((item) => item.id === numericId) : undefined) ??
-    allStories.find((item) => slugify(item.title) === paramValue)
-  if (!listed) redirect("/")
-
-  const [{ data: storyData }, { data: episodes }] = await Promise.all([
-    supabase.from("stories").select("*").eq("id", listed.id).single(),
-    getEpisodes(listed.id),
-  ])
-  const story = storyData as Story | null
-  if (!story) redirect("/")
+export default async function TrackPage({ params }: TrackParams) {
+  const data = await getTrackData(await paramValueOf(params))
+  if (!data) redirect("/")
+  const { story, episodes, allStories } = data
 
   const textUrl = story.text_url?.trim() || `/track/${storyPath(story)}`
   const isExternalTextUrl = /^https?:\/\//i.test(textUrl)
@@ -82,11 +81,24 @@ export default async function TrackPage({ params }: { params: Promise<{ slug?: s
     .filter((item) => item.id !== story.id)
     .slice(-6)
     .reverse()
+  const siteUrl = getSiteUrl()
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "AudioObject",
+    name: story.title,
+    description: plainDescription(story, 300),
+    url: `${siteUrl}/track/${storyPath(story)}`,
+    inLanguage: "vi",
+    ...(story.author ? { author: { "@type": "Person", name: story.author } } : {}),
+    ...(story.genre ? { genre: story.genre } : {}),
+    ...(story.cover_url ? { thumbnailUrl: story.cover_url } : {}),
+  }
 
   return (
     <div className="min-h-screen bg-background">
       <Header />
       <main className="w-full px-4 py-8 md:px-8 lg:px-12">
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }} />
         <Breadcrumb className="mb-8">
           <BreadcrumbList>
             <BreadcrumbItem><BreadcrumbLink href="/">Danh sách audio</BreadcrumbLink></BreadcrumbItem>

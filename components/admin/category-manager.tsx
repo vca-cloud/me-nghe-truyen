@@ -20,8 +20,7 @@ export function CategoryManager() {
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<Category | null>(null)
   const [form, setForm] = useState({ name: "", slug: "" })
-  const load = async () => {
-    const { data, error } = await supabase.from("categories").select("*").order("name")
+  const load = () => supabase.from("categories").select("*").order("name").then(({ data, error }) => {
     if (!error) {
       setItems(data || [])
       localStorage.setItem("admin-categories", JSON.stringify(data || []))
@@ -29,8 +28,8 @@ export function CategoryManager() {
     }
     const cached = localStorage.getItem("admin-categories")
     if (cached) setItems(JSON.parse(cached) as Category[])
-    else toast.error(`Lỗi tải thể loại: ${error.message}. Hãy chạy migration admin trong Supabase.`)
-  }
+    else toast.error(`Lỗi tải thể loại: ${error.message}`)
+  })
   useEffect(() => { void load() }, [])
   const save = async () => {
     const name = form.name.trim(); const slug = form.slug.trim() || slugify(name)

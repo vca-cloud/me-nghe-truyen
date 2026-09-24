@@ -67,26 +67,31 @@ export function AudioFormDialog({ story = null, open: controlledOpen, onOpenChan
     onOpenChange?.(nextOpen)
   }
 
-  useEffect(() => {
-    if (!open) return
-    setFormData({
-      title: story?.title ?? "",
-      author: story?.author ?? "",
-      genre: story?.genre ?? "",
-      description: story?.description ?? "",
-      cover_url: story?.cover_url ?? "",
-      text_url: story?.text_url ?? "",
-      status: story?.status || "Đang cập nhật",
-    })
-    setEpisodeForms(story?.episodes?.length
-      ? story.episodes.map(({ episode_number, title, audio_url, duration }) => ({
-          episode_number,
-          title,
-          audio_url,
-          duration: duration && parseDurationSeconds(duration) > 0 ? duration : "",
-        }))
-      : [{ ...emptyEpisode, audio_url: story?.audio_url ?? "" }])
-  }, [open, story])
+  // Điền lại form mỗi khi mở dialog hoặc đổi sang truyện khác (điều chỉnh state trong render thay vì effect).
+  const formKey = open ? `story-${story?.id ?? "new"}` : null
+  const [syncedFormKey, setSyncedFormKey] = useState<string | null>(null)
+  if (formKey !== syncedFormKey) {
+    setSyncedFormKey(formKey)
+    if (formKey) {
+      setFormData({
+        title: story?.title ?? "",
+        author: story?.author ?? "",
+        genre: story?.genre ?? "",
+        description: story?.description ?? "",
+        cover_url: story?.cover_url ?? "",
+        text_url: story?.text_url ?? "",
+        status: story?.status || "Đang cập nhật",
+      })
+      setEpisodeForms(story?.episodes?.length
+        ? story.episodes.map(({ episode_number, title, audio_url, duration }) => ({
+            episode_number,
+            title,
+            audio_url,
+            duration: duration && parseDurationSeconds(duration) > 0 ? duration : "",
+          }))
+        : [{ ...emptyEpisode, audio_url: story?.audio_url ?? "" }])
+    }
+  }
 
   useEffect(() => {
     if (!open) return

@@ -1,7 +1,8 @@
 import { BrandName, ContactLink, InfoPage } from "@/components/info-page"
 
 export const metadata = {
-  title: "Điều khoản sử dụng | mê nghe truyện",
+  title: "Điều khoản sử dụng",
+  alternates: { canonical: "/terms" },
   description: "Điều khoản sử dụng, miễn trừ trách nhiệm và bảo vệ bản quyền (DMCA) của mê nghe truyện.",
 }
 

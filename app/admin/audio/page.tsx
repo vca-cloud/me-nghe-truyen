@@ -33,60 +33,61 @@ interface Audio {
   episodes_list?: Episode[]
 }
 
+async function fetchAudioList() {
+  const { data: stories, error } = await supabase
+    .from("stories")
+    .select("*")
+    .order("id", { ascending: false })
+
+  if (error) throw error
+
+  const { data: episodes, error: episodesError } = await supabase
+    .from("episodes")
+    .select("id, story_id, episode_number, title, audio_url, duration")
+    .order("episode_number")
+
+  if (episodesError) throw episodesError
+
+  const episodesByStory = new Map<number, Episode[]>()
+  for (const episode of (episodes || []) as Episode[]) {
+    const storyId = Number(episode.story_id)
+    const items = episodesByStory.get(storyId) || []
+    items.push(episode)
+    episodesByStory.set(storyId, items)
+  }
+
+  const normalizedStories = ((stories || []) as Audio[]).map((story) => {
+    const episodesForStory = episodesByStory.get(Number(story.id)) || []
+    return {
+      ...story,
+      episodes: episodesForStory.length || story.episodes,
+      duration: formatClockDuration(story.duration),
+      episodes_list: episodesForStory,
+    }
+  })
+  return normalizedStories
+}
+
 export default function AudioPage() {
   const [audioList, setAudioList] = useState<Audio[]>([])
   const [loading, setLoading] = useState(true)
   const [editingStory, setEditingStory] = useState<StoryFormValues | null>(null)
   const [editOpen, setEditOpen] = useState(false)
 
-  const fetchAudios = async () => {
-    setLoading(true)
-    try {
-    const { data: stories, error } = await supabase
-      .from("stories")
-      .select("*")
-      .order("id", { ascending: false })
-
-      if (error) throw error
-
-      const { data: episodes, error: episodesError } = await supabase
-        .from("episodes")
-        .select("id, story_id, episode_number, title, audio_url, duration")
-        .order("episode_number")
-
-      if (episodesError) throw episodesError
-
-      const episodesByStory = new Map<number, Episode[]>()
-      for (const episode of (episodes || []) as Episode[]) {
-        const storyId = Number(episode.story_id)
-        const items = episodesByStory.get(storyId) || []
-        items.push(episode)
-        episodesByStory.set(storyId, items)
-      }
-
-      const normalizedStories = ((stories || []) as Audio[]).map((story) => {
-        const episodesForStory = episodesByStory.get(Number(story.id)) || []
-        return {
-          ...story,
-          episodes: episodesForStory.length || story.episodes,
-          duration: formatClockDuration(story.duration),
-          episodes_list: episodesForStory,
-        }
-      })
-
-      setAudioList(normalizedStories)
-      return normalizedStories
-    } catch (error: unknown) {
+  const fetchAudios = () => fetchAudioList()
+    .then((list) => {
+      setAudioList(list)
+      return list
+    })
+    .catch((error: unknown) => {
       const message = error instanceof Error ? error.message : "Không tải được dữ liệu."
       toast.error(`Lỗi tải dữ liệu: ${message}`)
       return []
-    } finally {
-      setLoading(false)
-    }
-  }
+    })
+    .finally(() => setLoading(false))
 
   const handleRefresh = () => {
-    void fetchAudios()
+    void refreshAudios()
   }
 
   const handleDelete = async (audio: Audio) => {
@@ -102,7 +103,7 @@ export default function AudioPage() {
       if (!response.ok) throw new Error(payload?.error || "Không thể xóa truyện.")
 
       toast.success("Đã xóa truyện và toàn bộ tập audio.")
-      await fetchAudios()
+      await refreshAudios()
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Không thể xóa truyện."
       toast.error(`Lỗi xóa truyện: ${message}`)
@@ -132,6 +133,11 @@ export default function AudioPage() {
     if (!open) {
       setEditingStory(null)
     }
+  }
+
+  const refreshAudios = () => {
+    setLoading(true)
+    return fetchAudios()
   }
 
   useEffect(() => {

@@ -49,7 +49,7 @@ export function ImportStoriesDialog({ onSuccess }: Props) {
   const processImport = async (stories: ParsedStory[], parseErrors: ParseError[]) => {
     let success = 0
     let updated = 0
-    let skipped = 0
+    const skipped = 0
     const errors = [...parseErrors]
     const existingByKey = new Map<string, { id: number; title: string }>()
 

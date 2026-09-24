@@ -1,7 +1,8 @@
 import { BrandName, InfoPage } from "@/components/info-page"
 
 export const metadata = {
-  title: "Giới thiệu | mê nghe truyện",
+  title: "Giới thiệu",
+  alternates: { canonical: "/about" },
   description: "Tiện ích giải trí, sứ mệnh và tầm nhìn của mê nghe truyện.",
 }
 

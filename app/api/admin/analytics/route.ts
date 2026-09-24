@@ -90,7 +90,7 @@ export async function GET(request: Request) {
     }))
     const totalClicks = affiliateLinks.reduce((sum, link) => sum + link.clicks, 0)
 
-    let uniqueIps = new Set<string>()
+    const uniqueIps = new Set<string>()
     let returningIps = 0
     let activeRealListeners = 0
     const activeRealByStory = new Map<number, number>()

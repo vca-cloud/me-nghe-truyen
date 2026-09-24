@@ -1,7 +1,8 @@
 import { CONTACT_EMAIL, InfoPage } from "@/components/info-page"
 
 export const metadata = {
-  title: "Liên hệ | mê nghe truyện",
+  title: "Liên hệ",
+  alternates: { canonical: "/contact" },
   description: "Liên hệ đội ngũ hỗ trợ mê nghe truyện qua email.",
 }
 

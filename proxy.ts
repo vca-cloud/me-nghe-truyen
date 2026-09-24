@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { ADMIN_SESSION_COOKIE, isValidAdminSession } from "@/lib/admin-session"
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname
   if (!pathname.startsWith("/admin") || pathname === "/admin/login") return NextResponse.next()
   const session = request.cookies.get(ADMIN_SESSION_COOKIE)?.value

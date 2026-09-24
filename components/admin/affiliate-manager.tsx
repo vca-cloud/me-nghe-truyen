@@ -34,15 +34,14 @@ export function AffiliateManager() {
   const [form, setForm] = useState<AffiliateLinkPayload>(emptyForm)
   const [fetchingImage, setFetchingImage] = useState(false)
 
-  const load = async () => {
+  const load = () => getAffiliateLinks()
+    .then(setItems)
+    .catch((error) => toast.error(error instanceof Error ? error.message : "Không tải được danh sách affiliate"))
+    .finally(() => setLoading(false))
+
+  const reload = () => {
     setLoading(true)
-    try {
-      setItems(await getAffiliateLinks())
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Không tải được danh sách affiliate")
-    } finally {
-      setLoading(false)
-    }
+    return load()
   }
 
   useEffect(() => {
@@ -105,7 +104,7 @@ export function AffiliateManager() {
       else await createAffiliateLink(payload)
       toast.success(editing ? "Đã cập nhật link" : "Đã thêm link mới")
       setOpen(false)
-      await load()
+      await reload()
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Không thể lưu link")
     }
@@ -119,7 +118,7 @@ export function AffiliateManager() {
         image_url: link.image_url,
         is_active: !link.is_active,
       })
-      await load()
+      await reload()
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Không thể đổi trạng thái link")
     }
@@ -130,7 +129,7 @@ export function AffiliateManager() {
     try {
       await deleteAffiliateLink(link.id)
       toast.success("Đã xóa link")
-      await load()
+      await reload()
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Không thể xóa link")
     }

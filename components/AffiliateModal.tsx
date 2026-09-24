@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { trackEvent } from "@/lib/analytics"
 
 interface AffiliateModalProps {
   isOpen: boolean
@@ -53,6 +54,7 @@ export function AffiliateModal({ isOpen, onClose, onUnlock, storyId }: Affiliate
   const handleUnlockClick = async () => {
     if (!link?.shoppe_url) return
     window.open(link.shoppe_url, "_blank", "noopener,noreferrer")
+    trackEvent("affiliate_click", { link_id: link.id, story_id: storyId })
     setSubmitting(true)
     try {
       await fetch(`/api/affiliate-links/${link.id}/click`, { method: "POST" })

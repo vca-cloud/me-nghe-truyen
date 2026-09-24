@@ -4,8 +4,10 @@ import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "re
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Slider } from "@/components/ui/slider"
-import { Headphones, Pause, Play, RotateCcw, RotateCw, SkipBack, SkipForward } from "lucide-react"
+import { Headphones, Moon, Pause, Play, RotateCcw, RotateCw, SkipBack, SkipForward } from "lucide-react"
 import { ImageWithFallback } from "@/components/image-with-fallback"
+import { trackEvent } from "@/lib/analytics"
+import { readLocalProgress, writeLocalProgress } from "@/lib/local-progress"
 
 interface HistoryRow {
   episode_id: number | null
@@ -32,6 +34,14 @@ interface AudioPlayerProps {
   storyId?: number
   episodeId?: number | null
 }
+
+type SleepMode = null | 15 | 30 | 60 | "episode"
+const SLEEP_OPTIONS: { value: Exclude<SleepMode, null>; label: string }[] = [
+  { value: 15, label: "15 phút" },
+  { value: 30, label: "30 phút" },
+  { value: 60, label: "60 phút" },
+  { value: "episode", label: "Hết tập" },
+]
 
 function formatTime(seconds: number) {
   if (!Number.isFinite(seconds) || seconds < 0) return "0:00"
@@ -67,12 +77,16 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(funct
   const [duration, setDuration] = useState(0)
   const [playbackRate, setPlaybackRate] = useState(1)
   const [error, setError] = useState<string | null>(null)
+  const [sleepMode, setSleepMode] = useState<SleepMode>(null)
+  const [sleepEndsAt, setSleepEndsAt] = useState<number | null>(null)
+  const [sleepRemaining, setSleepRemaining] = useState(0)
 
   const saveProgress = async (completed = false, force = false) => {
     if (!storyId || !audioRef.current || !Number.isFinite(duration)) return
     const progress = audioRef.current.currentTime
     if (!force && !completed && Math.abs(progress - lastSavedRef.current) < 5) return
     lastSavedRef.current = progress
+    writeLocalProgress(storyId, episodeId, { progress, duration, completed })
     await fetch("/api/listening-history", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -109,14 +123,19 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(funct
     restoredRef.current = false
     lastSavedRef.current = 0
 
+    const restore = (seconds: number) => {
+      audio.currentTime = seconds
+      setCurrentTime(seconds)
+    }
     const loadProgress = async () => {
       const response = await fetch(`/api/listening-history?storyId=${storyId}&episodeId=${episodeId || ""}`).catch(() => null)
-      if (!response?.ok) return
-      const data = await response.json().catch(() => ({})) as { history?: HistoryRow[] }
+      const data = response?.ok ? await response.json().catch(() => ({})) as { history?: HistoryRow[] } : {}
       const row = data.history?.[0]
-      if (row && !row.completed && row.progress_seconds > 0) {
-        audio.currentTime = row.progress_seconds
-        setCurrentTime(row.progress_seconds)
+      if (row) {
+        if (!row.completed && row.progress_seconds > 0) restore(row.progress_seconds)
+      } else if (storyId) {
+        const local = readLocalProgress(storyId, episodeId)
+        if (local && !local.completed && local.progress > 0) restore(local.progress)
       }
       restoredRef.current = true
     }
@@ -150,6 +169,58 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(funct
     else navigate(previousTrackId)
   }
 
+  const chooseSleep = (mode: SleepMode) => {
+    setSleepMode(mode)
+    setSleepEndsAt(typeof mode === "number" ? Date.now() + mode * 60_000 : null)
+    if (mode) trackEvent("sleep_timer_set", { mode: String(mode) })
+  }
+
+  useEffect(() => {
+    if (!sleepEndsAt) return
+    const tick = () => {
+      const left = sleepEndsAt - Date.now()
+      if (left <= 0) {
+        audioRef.current?.pause()
+        setSleepMode(null)
+        setSleepEndsAt(null)
+        setSleepRemaining(0)
+        return
+      }
+      setSleepRemaining(left)
+    }
+    tick()
+    const timer = window.setInterval(tick, 1000)
+    return () => window.clearInterval(timer)
+  }, [sleepEndsAt])
+
+  // Điều khiển trên màn hình khóa / tai nghe / thông báo hệ thống (Media Session API).
+  const actionsRef = useRef({ togglePlay, seek, handlePrevious, next: () => navigate(nextTrackId), currentTime })
+  actionsRef.current = { togglePlay, seek, handlePrevious, next: () => navigate(nextTrackId), currentTime }
+
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !("mediaSession" in navigator)) return
+    const artwork = coverUrl ? [{ src: coverUrl, sizes: "512x512" }] : []
+    navigator.mediaSession.metadata = new MediaMetadata({ title: episodeTitle, artist: title, album: "mê nghe truyện", artwork })
+    const set = (action: MediaSessionAction, handler: MediaSessionActionHandler | null) => {
+      try { navigator.mediaSession.setActionHandler(action, handler) } catch { /* trình duyệt không hỗ trợ action này */ }
+    }
+    set("play", () => { if (audioRef.current?.paused) actionsRef.current.togglePlay() })
+    set("pause", () => audioRef.current?.pause())
+    set("seekbackward", (details) => actionsRef.current.seek(actionsRef.current.currentTime - (details.seekOffset || 10)))
+    set("seekforward", (details) => actionsRef.current.seek(actionsRef.current.currentTime + (details.seekOffset || 10)))
+    set("seekto", (details) => { if (details.seekTime != null) actionsRef.current.seek(details.seekTime) })
+    set("previoustrack", () => actionsRef.current.handlePrevious())
+    set("nexttrack", nextTrackId ? () => actionsRef.current.next() : null)
+    return () => {
+      for (const action of ["play", "pause", "seekbackward", "seekforward", "seekto", "previoustrack", "nexttrack"] as MediaSessionAction[]) set(action, null)
+    }
+  }, [title, episodeTitle, coverUrl, nextTrackId])
+
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !("mediaSession" in navigator)) return
+    navigator.mediaSession.playbackState = isPlaying ? "playing" : "paused"
+  }, [isPlaying])
+
   return (
     <div className="flex w-full flex-col gap-6">
       <audio
@@ -159,12 +230,17 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(funct
         onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
         onTimeUpdate={(e) => {
           setCurrentTime(e.currentTarget.currentTime)
+          const media = e.currentTarget
+          if ("mediaSession" in navigator && Number.isFinite(media.duration) && media.duration > 0) {
+            try { navigator.mediaSession.setPositionState({ duration: media.duration, position: Math.min(media.currentTime, media.duration), playbackRate: media.playbackRate }) } catch { /* bỏ qua */ }
+          }
           if (restoredRef.current && e.currentTarget.currentTime - lastSavedRef.current >= 10) void saveProgress()
         }}
         onPlay={() => {
           setIsPlaying(true)
           if (!startedRef.current) {
             startedRef.current = true
+            trackEvent("audio_play", { story_id: storyId, episode_id: episodeId, story_title: title, episode_title: episodeTitle })
             onPlayStarted?.()
             void saveProgress(false, true)
           }
@@ -177,6 +253,11 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(funct
           setIsPlaying(false)
           void saveProgress(true)
           startedRef.current = false
+          trackEvent("audio_complete", { story_id: storyId, episode_id: episodeId, story_title: title, episode_title: episodeTitle })
+          if (sleepMode === "episode") {
+            setSleepMode(null)
+            return
+          }
           onEnded?.()
           if (!onEnded) navigate(nextTrackId)
         }}
@@ -248,6 +329,30 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(funct
               {rate}x
             </Button>
           ))}
+        </div>
+
+        <div className="flex w-full flex-col items-center gap-2">
+          <div className="flex items-center gap-2 text-sm font-medium text-[#154B95] dark:text-[#9ECDDD]">
+            <Moon className="h-4 w-4" />
+            {sleepMode === "episode"
+              ? "Sẽ dừng khi hết tập này"
+              : sleepMode
+                ? `Tự tắt sau ${formatTime(sleepRemaining / 1000)}`
+                : "Hẹn giờ tắt"}
+          </div>
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            {SLEEP_OPTIONS.map((option) => (
+              <Button
+                key={option.value}
+                variant={sleepMode === option.value ? "default" : "outline"}
+                size="sm"
+                onClick={() => chooseSleep(sleepMode === option.value ? null : option.value)}
+              >
+                {option.label}
+              </Button>
+            ))}
+            {sleepMode && <Button variant="ghost" size="sm" onClick={() => chooseSleep(null)}>Hủy</Button>}
+          </div>
         </div>
       </div>
     </div>

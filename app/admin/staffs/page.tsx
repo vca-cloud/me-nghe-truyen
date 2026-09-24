@@ -13,22 +13,22 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { toast } from "sonner"
 
 type Staff = { id: number; name: string; email: string; locked: boolean; created_at?: string }
+
+async function fetchStaffs(): Promise<Staff[]> {
+  const response = await fetch("/api/admin/staffs", { cache: "no-store" })
+  const payload = await response.json()
+  if (!response.ok) throw new Error(payload?.error || "Không tải được dữ liệu.")
+  return payload.staffs || []
+}
 export default function StaffsPage() {
   const [staffs, setStaffs] = useState<Staff[]>([])
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<Staff | null>(null)
   const [form, setForm] = useState({ name: "", email: "", password: "" })
 
-  const load = async () => {
-    try {
-      const response = await fetch("/api/admin/staffs", { cache: "no-store" })
-      const payload = await response.json()
-      if (!response.ok) throw new Error(payload?.error || "Không tải được dữ liệu.")
-      setStaffs(payload.staffs || [])
-    } catch (error) {
-      toast.error(`Lỗi tải quản trị viên: ${error instanceof Error ? error.message : "Không tải được dữ liệu."}`)
-    }
-  }
+  const load = () => fetchStaffs()
+    .then(setStaffs)
+    .catch((error) => toast.error(`Lỗi tải quản trị viên: ${error instanceof Error ? error.message : "Không tải được dữ liệu."}`))
 
   useEffect(() => {
     void load()

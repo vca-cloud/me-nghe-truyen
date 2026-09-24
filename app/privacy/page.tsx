@@ -1,7 +1,8 @@
 import { BrandName, ContactLink, InfoPage } from "@/components/info-page"
 
 export const metadata = {
-  title: "Chính sách bảo mật | mê nghe truyện",
+  title: "Chính sách bảo mật",
+  alternates: { canonical: "/privacy" },
   description: "Cách mê nghe truyện thu thập, sử dụng và bảo vệ thông tin của người dùng.",
 }
 

@@ -9,7 +9,9 @@ import { ThemeToggle } from "@/components/theme-toggle"
 import { createClient } from "@/lib/supabase-client"
 import type { User } from "@supabase/supabase-js"
 
-export function Header({ value = "", onChange = () => {}, onKeyDown = () => {}, suggestions = [], onSuggestion = () => {} }: { value?: string; onChange?: (value: string) => void; onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void; suggestions?: any[]; onSuggestion?: (story: any) => void }) {
+type HeaderSuggestion = { id: number; title: string; genre?: string | null }
+
+export function Header<T extends HeaderSuggestion = HeaderSuggestion>({ value = "", onChange = () => {}, onKeyDown = () => {}, suggestions = [], onSuggestion = () => {} }: { value?: string; onChange?: (value: string) => void; onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void; suggestions?: T[]; onSuggestion?: (story: T) => void }) {
   const [user, setUser] = useState<User | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const supabase = useMemo(() => createClient(), [])

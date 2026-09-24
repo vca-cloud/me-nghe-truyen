@@ -2,6 +2,7 @@ import { HomePage } from "@/components/home-page"
 import { getHomeStories } from "@/lib/home-stories"
 
 export const revalidate = 60
+export const metadata = { alternates: { canonical: "/" } }
 
 export default async function Page() {
   const stories = await getHomeStories().catch((error: unknown) => {
