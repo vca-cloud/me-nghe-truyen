@@ -208,6 +208,7 @@ Chạy theo thứ tự các file trong `supabase/migrations/`:
 - `20250912_add_story_text_url.sql`
 - `20250913_create_member_account_tables.sql`
 - `20250914_lock_public_writes.sql` — anon/authenticated chỉ SELECT trên stories/episodes/categories/affiliate_links
+- `20250915_record_story_listen.sql` — hàm `record_story_listen` (service_role) chống trùng IP + cộng `real_views` nguyên tử; `/api/increment-views` tự fallback cách cũ nếu hàm chưa có
 
 Migration member tạo `favorites` (khóa ghép user/story) và `listening_history` (FK story/episode, progress, duration, completed, timestamp), index và RLS. Khi sửa unique/upsert cho row story-level có `episode_id NULL`, phải lưu ý PostgreSQL unique index cho phép nhiều NULL và cần thiết kế khóa/constraint phù hợp.
 
@@ -217,14 +218,13 @@ Migration member tạo `favorites` (khóa ghép user/story) và `listening_histo
 
 - 4 route service role thiếu kiểm tra session nay gọi `hasAdminSession()`; `/api/sync-user` lấy user từ session server; open redirect `/\evil.com`; session hết hạn 7 ngày; `ADMIN_SESSION_SECRET` đặt trên Vercel.
 - Ghi admin chuyển sang `/api/admin/db`; đã chạy `20250914_lock_public_writes.sql` trên production (anon INSERT bị RLS chặn, UPDATE không ảnh hưởng dòng nào).
-- Mật khẩu staff băm scrypt, giới hạn đăng nhập sai, khóa staff thu hồi quyền API ngay. Script `scripts/hash-staff-passwords.ts` băm các mật khẩu còn plaintext (chạy sau khi deploy).
+- Mật khẩu staff băm scrypt (cả 2 staff đã băm 2026-09-24), giới hạn đăng nhập sai, khóa staff thu hồi quyền API ngay. Script `scripts/hash-staff-passwords.ts` băm mật khẩu còn plaintext nếu có.
 - Security headers trong `next.config.ts` (X-Frame-Options DENY, `frame-ancestors 'none'`, nosniff, Referrer-Policy, Permissions-Policy).
 - `/api/increment-views` không cộng lại trong 30 phút cho cùng IP + truyện (dựa `listener_logs`), không trả IP; `/api/affiliate-links/[id]/click` chặn click lặp 10 phút theo IP + link (bộ nhớ instance); preview chỉ nhận `https` host `shopee.vn`, `*.shopee.vn`, `shp.ee`.
 
 Còn lại:
 
-- Cộng `real_views` vẫn là đọc-rồi-ghi (có thể mất lượt khi đồng thời); muốn chính xác cần hàm SQL tăng nguyên tử.
-- Chống bot đăng ký: bật Confirm email + CAPTCHA (Turnstile) trong Supabase Auth và gắn token vào form signup.
+- Chống bot đăng ký: Confirm email đã bật từ trước. Form signup (`lib/signup-validation.ts`) kiểm tra họ tên, email (chặn Gmail ≥3 dấu chấm), mật khẩu ≥8 ký tự có chữ + số, không khoảng trắng, honeypot `website`, và hiện màn hình "kiểm tra email" khi chưa có session. Bot gọi thẳng Supabase Auth API vẫn vượt qua được form: cần đặt yêu cầu mật khẩu trong Supabase Auth và CAPTCHA (Turnstile) nếu còn bot.
 
 ## Known limitations và kiểm thử
 

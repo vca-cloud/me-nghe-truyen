@@ -23,6 +23,15 @@ export async function POST(request: Request) {
     })
 
     const ip = clientIp(request)
+
+    const rpc = await db.rpc("record_story_listen", { p_story_id: storyId, p_ip: ip, p_window_minutes: DEDUPE_WINDOW_MS / 60000 })
+    if (!rpc.error) {
+      if (rpc.data === null) return NextResponse.json({ error: "Không tìm thấy truyện" }, { status: 404 })
+      return NextResponse.json({ ok: true, counted: rpc.data === true })
+    }
+    // Hàm SQL chưa được tạo (chưa chạy migration 20250915): dùng cách cũ.
+    if (rpc.error.code !== "PGRST202" && rpc.error.code !== "42883") throw rpc.error
+
     const since = new Date(Date.now() - DEDUPE_WINDOW_MS).toISOString()
     const { count } = await db
       .from("listener_logs")

@@ -35,7 +35,13 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
     setLoading(true)
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
     setLoading(false)
-    if (error) { toast.error(`Đăng nhập thất bại: ${error.message}`); return }
+    if (error) {
+      const text = error.message.toLowerCase()
+      if (text.includes("email not confirmed")) toast.error("Bạn chưa xác nhận email. Mở hộp thư (kể cả Spam) và bấm link xác nhận chúng tôi đã gửi, rồi đăng nhập lại.")
+      else if (text.includes("invalid login credentials")) toast.error("Email hoặc mật khẩu không đúng.")
+      else toast.error(`Đăng nhập thất bại: ${error.message}`)
+      return
+    }
     await syncUser(data.user)
     toast.success("Đăng nhập thành công")
     const nextPath = getSafeNextPath(new URLSearchParams(window.location.search).get("next"))
