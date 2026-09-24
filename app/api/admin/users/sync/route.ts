@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server"
+import { hasAdminSession } from "@/lib/admin-session"
 import { syncAllAuthUsers } from "@/lib/sync-admin-user"
 
 export async function POST() {
+  if (!(await hasAdminSession())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   try {
     const synced = await syncAllAuthUsers()
     return NextResponse.json({ ok: true, count: synced.length, emails: synced })

@@ -12,7 +12,8 @@
 - Khi sửa schema Supabase, tạo/cập nhật migration trong `supabase/migrations/` và chạy trên đúng project trước khi kiểm thử production.
 - Không gọi một thay đổi local là đã push GitHub/deploy Vercel nếu chưa thấy lệnh tương ứng thành công.
 - Khi đề cập code trong tài liệu hoặc review, dùng đường dẫn file tương đối và xác minh file còn tồn tại.
-- Route admin mới (`/api/admin/*`, `/api/backup`) phải tự kiểm tra `isValidAdminSession` từ `lib/admin-session.ts`; middleware không bảo vệ API. Xem mục **Nợ bảo mật**.
+- Route admin mới (`/api/admin/*`, `/api/backup`) phải gọi `hasAdminSession()` từ `lib/admin-session.ts` ở đầu mỗi handler; middleware không bảo vệ API. Session ký bằng `ADMIN_SESSION_SECRET` (đã đặt trên Vercel), hết hạn sau 7 ngày theo `issuedAt`.
+- Tham số `next` sau đăng nhập luôn đi qua `getSafeNextPath` (`lib/site-url.ts`), chặn `//`, `\` và ký tự điều khiển.
 
 ## Lệnh và công nghệ
 
@@ -209,13 +210,18 @@ Chạy theo thứ tự các file trong `supabase/migrations/`:
 
 Migration member tạo `favorites` (khóa ghép user/story) và `listening_history` (FK story/episode, progress, duration, completed, timestamp), index và RLS. Khi sửa unique/upsert cho row story-level có `episode_id NULL`, phải lưu ý PostgreSQL unique index cho phép nhiều NULL và cần thiết kế khóa/constraint phù hợp.
 
-## Nợ bảo mật (chưa xử lý, rà soát 2026-09-23)
+## Nợ bảo mật (rà soát 2026-09-23/24)
 
-Theo migration trong repo (cần đối chiếu policy thật trên Supabase production):
+Đã xử lý 2026-09-24: 4 route service role không kiểm tra session (`admin/users`, `admin/users/sync`, `admin/analytics`, `backup`) nay gọi `hasAdminSession()`; `/api/sync-user` lấy user từ session server (bỏ qua body); open redirect `/\evil.com`; session có hạn 7 ngày; đặt `ADMIN_SESSION_SECRET`.
 
-- `stories`, `episodes`, `categories`, `admin_users`, `affiliate_links` có policy `FOR ALL TO anon, authenticated USING (true) WITH CHECK (true)`. Anon key nằm trong client bundle, nên bất kỳ ai cũng có thể sửa/xóa truyện, đổi URL affiliate hoặc đọc/sửa `admin_users` (email thành viên). Chỉ `staffs` đã được khóa bởi `20250911_lock_staffs_rls.sql`.
-- API dùng service role nhưng **không** kiểm tra `admin_session`: `app/api/admin/users/route.ts` (GET/POST/PUT/DELETE), `app/api/admin/users/sync/route.ts` (trả về toàn bộ email user Auth), `app/api/admin/analytics/route.ts`, `app/api/backup/route.ts`. Các route đã kiểm tra: `admin/login`, `admin/staffs`, `admin/stories`.
-- Hướng sửa: chuyển các thao tác ghi admin sang API server có kiểm tra `isValidAdminSession` + service role, rồi thu hẹp RLS về SELECT cho anon (ẩn `admin_users` hoàn toàn); thêm kiểm tra session vào 4 route trên. Làm thành task riêng, kèm migration.
+Còn lại:
+
+- RLS: theo migration, `stories`, `episodes`, `categories`, `admin_users`, `affiliate_links` có policy `FOR ALL TO anon, authenticated USING (true) WITH CHECK (true)` và admin UI ghi trực tiếp bằng anon key. Production đã khác migration (anon không đọc được `admin_users`, 2026-09-24) — phải lấy policy thật trước khi viết migration. Hướng sửa: chuyển ghi admin sang API server có `hasAdminSession()` + service role, rồi thu hẹp anon về SELECT.
+- `staffs.password` lưu plaintext, login không giới hạn số lần thử, khóa staff không thu hồi session đang mở.
+- Thiếu security headers (chỉ có HSTS): cần `frame-ancestors`/`X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`.
+- `/api/increment-views`, `/api/affiliate-links/[id]/click` không chống spam; `increment-views` trả IP về client và cộng view kiểu read-modify-write.
+- `/api/affiliate-links/preview` lọc host bằng regex `(^|\.)shopee\.` (cho qua `shopee.<domain lạ>`).
+- Có dấu hiệu bot đăng ký; cần bật Confirm email + CAPTCHA trong Supabase Auth.
 
 ## Known limitations và kiểm thử
 

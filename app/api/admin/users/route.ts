@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server"
+import { hasAdminSession } from "@/lib/admin-session"
 import { createClient } from "@supabase/supabase-js"
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
 export async function GET() {
+  if (!(await hasAdminSession())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   if (!supabaseUrl || !supabaseServiceKey) {
     return NextResponse.json({ error: "Thiếu config Supabase" }, { status: 500 })
   }
@@ -30,6 +32,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  if (!(await hasAdminSession())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   if (!supabaseUrl || !supabaseServiceKey) {
     return NextResponse.json({ error: "Thiếu config Supabase" }, { status: 500 })
   }
@@ -70,6 +73,7 @@ export async function POST(request: Request) {
 }
 
 export async function PUT(request: Request) {
+  if (!(await hasAdminSession())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   if (!supabaseUrl || !supabaseServiceKey) {
     return NextResponse.json({ error: "Thiếu config Supabase" }, { status: 500 })
   }
@@ -110,6 +114,7 @@ export async function PUT(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+  if (!(await hasAdminSession())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   if (!supabaseUrl || !supabaseServiceKey) {
     return NextResponse.json({ error: "Thiếu config Supabase" }, { status: 500 })
   }

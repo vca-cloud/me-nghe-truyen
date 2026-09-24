@@ -22,6 +22,6 @@ export function getSiteUrl(fallbackOrigin?: string) {
 }
 
 export function getSafeNextPath(value: string | null | undefined) {
-  if (!value || !value.startsWith("/") || value.startsWith("//")) return "/"
+  if (!value || !value.startsWith("/") || value.startsWith("//") || /[\\\u0000-\u001f]/.test(value)) return "/"
   return value
 }

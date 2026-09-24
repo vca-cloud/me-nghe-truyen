@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { hasAdminSession } from "@/lib/admin-session"
 import { createClient } from "@supabase/supabase-js"
 
 export const dynamic = "force-dynamic"
@@ -27,6 +28,7 @@ const genresOf = (value: unknown) => {
 }
 
 export async function GET(request: Request) {
+  if (!(await hasAdminSession())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
   if (!supabaseUrl || !serviceRoleKey) return NextResponse.json({ error: "Thiếu cấu hình Supabase server." }, { status: 500 })

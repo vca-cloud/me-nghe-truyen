@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
-import { ADMIN_SESSION_COOKIE, createAdminSession } from "@/lib/admin-session"
+import { ADMIN_SESSION_COOKIE, ADMIN_SESSION_MAX_AGE_SECONDS, createAdminSession } from "@/lib/admin-session"
 
 export async function POST(request: Request) {
   const { email, password } = await request.json().catch(() => ({}))
@@ -16,6 +16,6 @@ export async function POST(request: Request) {
   if (!staff || staff.locked || staff.password !== password) return NextResponse.json({ error: "Email hoặc mật khẩu không đúng." }, { status: 401 })
 
   const response = NextResponse.json({ ok: true })
-  response.cookies.set(ADMIN_SESSION_COOKIE, await createAdminSession(staff.email), { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/", maxAge: 60 * 60 * 24 * 7 })
+  response.cookies.set(ADMIN_SESSION_COOKIE, await createAdminSession(staff.email), { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/", maxAge: ADMIN_SESSION_MAX_AGE_SECONDS })
   return response
 }

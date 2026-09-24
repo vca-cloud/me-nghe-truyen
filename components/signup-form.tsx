@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input"
 import Link from "next/link"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase-client"
-import { getSiteUrl } from "@/lib/site-url"
+import { getSafeNextPath, getSiteUrl } from "@/lib/site-url"
 
 const inputClass = "dark:bg-[#9ECDDD] dark:text-[#154B95] dark:placeholder:text-[#2D74A8]"
 
@@ -63,8 +63,7 @@ export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
     await syncUser(user)
     setLoading(false)
     toast.success("Đăng ký thành công")
-    const nextPath = new URLSearchParams(window.location.search).get("next")
-    const safeNext = nextPath?.startsWith("/") && !nextPath.startsWith("//") ? nextPath : "/"
+    const safeNext = getSafeNextPath(new URLSearchParams(window.location.search).get("next"))
     window.location.assign(new URL(safeNext, getSiteUrl(window.location.origin)).toString())
   }
 
