@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { trackEvent } from "@/lib/analytics"
 
 interface AffiliateModalProps {
@@ -45,6 +45,23 @@ export function AffiliateModal({ isOpen, onClose, onUnlock, storyId }: Affiliate
     void fetchActiveLink()
   }, [])
 
+  const impressionSentRef = useRef(false)
+  useEffect(() => {
+    if (!isOpen) {
+      impressionSentRef.current = false
+      return
+    }
+    if (!link || impressionSentRef.current) return
+    impressionSentRef.current = true
+    trackEvent("affiliate_impression", { link_id: link.id, story_id: storyId })
+    void fetch("/api/affiliate-events", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ event: "impression", linkId: link.id, storyId }),
+      keepalive: true,
+    }).catch(() => undefined)
+  }, [isOpen, link, storyId])
+
   const finishUnlock = () => {
     onUnlock()
     onClose()
@@ -57,7 +74,11 @@ export function AffiliateModal({ isOpen, onClose, onUnlock, storyId }: Affiliate
     trackEvent("affiliate_click", { link_id: link.id, story_id: storyId })
     setSubmitting(true)
     try {
-      await fetch(`/api/affiliate-links/${link.id}/click`, { method: "POST" })
+      await fetch(`/api/affiliate-links/${link.id}/click`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ storyId }),
+      })
       if (storyId !== undefined) {
         await fetch("/api/increment-views", {
           method: "POST",

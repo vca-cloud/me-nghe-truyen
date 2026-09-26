@@ -28,20 +28,24 @@ const genresOf = (value: unknown) => {
 }
 
 type LogRow = { ip_address: string | null; story_id: number | null; created_at: string }
+type AffiliateEventRow = { event: "impression" | "click"; link_id: number | null; story_id: number | null; visitor_hash: string; created_at: string }
 
-// PostgREST trả tối đa 1000 dòng mỗi lần; đọc theo trang để không bỏ sót log.
-async function fetchAllLogs(db: SupabaseClient, from: string | null, to: string | null) {
-  const rows: LogRow[] = []
+// PostgREST trả tối đa 1000 dòng mỗi lần; đọc theo trang để không bỏ sót dữ liệu.
+async function fetchAllRows<T>(db: SupabaseClient, table: string, columns: string, from: string | null, to: string | null) {
+  const rows: T[] = []
   for (let offset = 0; ; offset += 1000) {
-    let query = db.from("listener_logs").select("ip_address, story_id, created_at").order("id").range(offset, offset + 999)
+    let query = db.from(table).select(columns).order("id").range(offset, offset + 999)
     if (from) query = query.gte("created_at", from)
     if (to) query = query.lt("created_at", to)
     const { data, error } = await query
     if (error) return { rows, error }
-    rows.push(...((data || []) as LogRow[]))
+    rows.push(...((data || []) as T[]))
     if (!data || data.length < 1000) return { rows, error: null }
   }
 }
+
+// Ngày theo giờ Việt Nam (UTC+7) để gom biểu đồ theo ngày.
+const vnDay = (iso: string) => new Date(Date.parse(iso) + 7 * 3600 * 1000).toISOString().slice(0, 10)
 
 export async function GET(request: Request) {
   if (!(await hasAdminSession())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -61,9 +65,14 @@ export async function GET(request: Request) {
       db.from("episodes").select("id", { count: "exact", head: true }),
       db.from("admin_users").select("auth_id", { count: "exact", head: true }),
       db.from("affiliate_links").select("*").order("clicks", { ascending: false }),
-      fetchAllLogs(db, from, to),
+      fetchAllRows<LogRow>(db, "listener_logs", "ip_address, story_id, created_at", from, to),
       db.from("listener_logs").select("created_at").order("created_at", { ascending: true }).limit(1),
     ])
+    const [affiliateEvents, firstEventResult] = await Promise.all([
+      fetchAllRows<AffiliateEventRow>(db, "affiliate_events", "event, link_id, story_id, visitor_hash, created_at", from, to),
+      db.from("affiliate_events").select("created_at").order("created_at", { ascending: true }).limit(1),
+    ])
+    if (affiliateEvents.error) console.warn("affiliate_events unavailable:", affiliateEvents.error.message)
 
     if (storiesResult.error) throw new Error(`stories: ${storiesResult.error.message}`)
     if (episodesResult.error) throw new Error(`episodes: ${episodesResult.error.message}`)
@@ -110,6 +119,40 @@ export async function GET(request: Request) {
     const periodListeners = listensPerIp.size
     const returningListeners = [...listensPerIp.values()].filter((count) => count > 1).length
 
+    const storyTitle = new Map(stories.map((story) => [story.id, story.title]))
+    const linkTitle = new Map(affiliateLinks.map((link) => [link.id, link.title]))
+    const byDay = new Map<string, { impressions: number; clicks: number }>()
+    const byStory = new Map<number, { impressions: number; clicks: number }>()
+    const byLink = new Map<number, { impressions: number; clicks: number }>()
+    const viewers = new Set<string>()
+    const clickers = new Set<string>()
+    let impressions = 0
+    let clicks = 0
+    const bump = <K,>(map: Map<K, { impressions: number; clicks: number }>, key: K, event: AffiliateEventRow["event"]) => {
+      const entry = map.get(key) || { impressions: 0, clicks: 0 }
+      if (event === "click") entry.clicks++
+      else entry.impressions++
+      map.set(key, entry)
+    }
+    for (const row of affiliateEvents.rows) {
+      if (row.event === "click") { clicks++; clickers.add(row.visitor_hash) } else { impressions++; viewers.add(row.visitor_hash) }
+      bump(byDay, vnDay(row.created_at), row.event)
+      if (row.story_id) bump(byStory, row.story_id, row.event)
+      if (row.link_id) bump(byLink, row.link_id, row.event)
+    }
+    const withRate = (value: { impressions: number; clicks: number }) => ({ ...value, rate: value.impressions ? value.clicks / value.impressions * 100 : null })
+    const affiliate = {
+      since: firstEventResult.data?.[0]?.created_at ?? null,
+      impressions,
+      clicks,
+      uniqueViewers: viewers.size,
+      uniqueClickers: clickers.size,
+      conversionRate: impressions ? clicks / impressions * 100 : null,
+      byDay: [...byDay.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([date, value]) => ({ date, ...value })),
+      byStory: [...byStory.entries()].map(([id, value]) => ({ id, title: storyTitle.get(id) || `#${id}`, ...withRate(value) })).sort((a, b) => b.clicks - a.clicks || b.impressions - a.impressions).slice(0, 10),
+      byLink: [...byLink.entries()].map(([id, value]) => ({ id, title: linkTitle.get(id) || `#${id}`, ...withRate(value) })).sort((a, b) => b.clicks - a.clicks),
+    }
+
     const realViews = stories.reduce((sum, story) => sum + story.realViews, 0)
     const fakeViews = stories.reduce((sum, story) => sum + story.fakeViews, 0)
     const activeFakeListeners = randomBetween(15, 85)
@@ -155,6 +198,7 @@ export async function GET(request: Request) {
       genreStats,
       affiliateLinks,
       totalClicks,
+      affiliate,
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : "Không thể tải dữ liệu analytics."

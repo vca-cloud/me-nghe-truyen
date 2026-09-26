@@ -1,6 +1,8 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { AffiliateFunnel, type AffiliateStats } from "@/components/admin/affiliate-funnel"
+import { SystemUsage } from "@/components/admin/system-usage"
 import { formatDateVN } from "@/lib/utils"
 import { AdminShell } from "@/components/admin/admin-shell"
 import { Badge } from "@/components/ui/badge"
@@ -59,6 +61,7 @@ export default function AnalyticsPage() {
   const [stories, setStories] = useState<Story[]>([])
   const [genreStats, setGenreStats] = useState<GenreStat[]>([])
   const [affiliateLinks, setAffiliateLinks] = useState<AffiliateLink[]>([])
+  const [affiliateStats, setAffiliateStats] = useState<AffiliateStats | null>(null)
   const [metrics, setMetrics] = useState({
     totalStories: 0,
     totalEpisodes: 0,
@@ -108,6 +111,7 @@ export default function AnalyticsPage() {
         setStories(payload.stories || [])
         setGenreStats(payload.genreStats || [])
         setAffiliateLinks(payload.affiliateLinks || [])
+        setAffiliateStats(payload.affiliate || null)
         setMetrics({
           totalStories: numberValue(payload.metrics?.totalStories),
           totalEpisodes: numberValue(payload.metrics?.totalEpisodes),
@@ -409,6 +413,10 @@ export default function AnalyticsPage() {
             </div>
           </div>
         </section>
+
+        <AffiliateFunnel stats={affiliateStats} periodLabel={periodLabel} />
+
+        <SystemUsage />
       </div>
     </AdminShell>
   )

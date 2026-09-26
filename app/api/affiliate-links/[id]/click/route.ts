@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { createClient, type SupabaseClient } from "@supabase/supabase-js"
 import { clientIp } from "@/lib/request-ip"
+import { visitorHash } from "@/lib/visitor"
 
 function createDb(): SupabaseClient | null {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -35,6 +36,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (!db) {
       return NextResponse.json({ error: "Thiếu cấu hình Supabase" }, { status: 500 })
     }
+
+    const body = await request.json().catch(() => null)
+    const storyId = Number(body?.storyId)
+    const { error: eventError } = await db.from("affiliate_events").insert({
+      event: "click",
+      link_id: linkId,
+      story_id: Number.isInteger(storyId) && storyId > 0 ? storyId : null,
+      visitor_hash: visitorHash(request),
+    })
+    if (eventError) console.warn("affiliate_events click:", eventError.message)
 
     const { data, error } = await db.rpc("increment_affiliate_click", { link_id: linkId })
     if (!error) {

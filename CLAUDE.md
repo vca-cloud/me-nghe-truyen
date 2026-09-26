@@ -42,6 +42,11 @@ SUPABASE_SERVICE_ROLE_KEY=
 ADMIN_SESSION_SECRET=
 NEXT_PUBLIC_R2_PUBLIC_URL=
 NEXT_PUBLIC_SITE_URL=https://menghetruyen.com
+# Tùy chọn, cho mục Tài nguyên hệ thống trên dashboard:
+CLOUDFLARE_API_TOKEN=      # token chỉ quyền Account Analytics: Read
+CLOUDFLARE_ACCOUNT_ID=
+R2_BUCKET_NAME=            # bỏ trống = cộng mọi bucket
+# USAGE_LIMIT_* ghi đè hạn mức gói Free (xem app/api/admin/usage/route.ts)
 ```
 
 ## Cấu trúc và route
@@ -111,6 +116,8 @@ total views = real_views + base_fake_views
 `base_fake_views` có thể fallback từ `plays` legacy ở lớp normalize/API; `plays` không được cộng thêm nếu đã dùng `base_fake_views`. Không tự đồng bộ ngược các giá trị view trừ khi code/migration nói rõ.
 
 Dashboard `/admin/analytics` (`app/api/admin/analytics/route.ts`): phần **tổng quan** (truyện, tập, thành viên, `real_views`/`base_fake_views` qua `lib/story-views.ts`, tổng click affiliate) luôn là toàn thời gian; bộ lọc ngày chỉ áp dụng cho **lượt nghe theo kỳ** tính từ `listener_logs` (đọc phân trang, có từ 2026-09-24). Không dùng tỷ lệ click/lượt nghe dạng %: nghe bắt buộc qua affiliate nên chỉ số này luôn ≥100%; hiển thị tổng click và click trung bình mỗi lượt nghe thực. "Đang nghe (mô phỏng)" là số ngẫu nhiên, phải ghi rõ trên UI. Đăng xuất admin gọi `POST /api/admin/logout` để xóa cookie.
+
+Mục **Affiliate** (`components/admin/affiliate-funnel.tsx`) tính từ `affiliate_events` theo kỳ: popup hiển thị (ghi qua `POST /api/affiliate-events`, chống trùng 1 phút), click (ghi trong route click, chống trùng 10 phút), tỷ lệ chuyển đổi = click/hiển thị, theo ngày (giờ VN), theo truyện, theo link. Mục **Tài nguyên hệ thống** (`components/admin/system-usage.tsx` → `GET /api/admin/usage`, cache 1 giờ, `?refresh=1`): Supabase qua RPC `admin_system_usage` + MAU ước tính từ `last_sign_in_at`; Cloudflare R2 qua GraphQL Analytics (`r2StorageAdaptiveGroups`, `r2OperationsAdaptiveGroups`, phân Class A/B theo `actionType`). Egress Supabase và băng thông Vercel không có API công khai nên chỉ gắn link tới trang Usage.
 
 `real_views` được tăng bởi `/api/increment-views` sau luồng mở khóa audio và ghi `listener_logs` theo IP. Analytics phải dùng cùng mô hình tổng view; khi thay đổi mô hình cần rà soát `lib/story-views.ts`, trang chủ, track và admin analytics cùng lúc.
 
@@ -215,6 +222,7 @@ Chạy theo thứ tự các file trong `supabase/migrations/`:
 - `20250912_add_story_text_url.sql`
 - `20250913_create_member_account_tables.sql`
 - `20250914_lock_public_writes.sql` — anon/authenticated chỉ SELECT trên stories/episodes/categories/affiliate_links
+- `20250916_affiliate_events_and_usage.sql` — bảng `affiliate_events` (impression/click, `visitor_hash` = SHA-256 IP+secret) và hàm `admin_system_usage()` (dung lượng DB, Storage, bảng lớn nhất), chỉ service_role
 - `20250915_record_story_listen.sql` — tạo `listener_logs` nếu thiếu (production chưa từng chạy `20250910`, trước 2026-09-24 log IP không được ghi) và hàm `record_story_listen` (service_role) chống trùng IP + cộng `real_views` nguyên tử; `/api/increment-views` tự fallback cách cũ nếu hàm chưa có
 
 Migration member tạo `favorites` (khóa ghép user/story) và `listening_history` (FK story/episode, progress, duration, completed, timestamp), index và RLS. Khi sửa unique/upsert cho row story-level có `episode_id NULL`, phải lưu ý PostgreSQL unique index cho phép nhiều NULL và cần thiết kế khóa/constraint phù hợp.
