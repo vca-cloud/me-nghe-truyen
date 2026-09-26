@@ -61,7 +61,7 @@ export function AffiliateFunnel({ stats, periodLabel }: { stats: AffiliateStats 
       <div>
         <h2 className="text-lg font-semibold">4. Affiliate: {periodLabel}</h2>
         <p className="text-sm text-muted-foreground">
-          {stats.since ? `Dữ liệu sự kiện có từ ${formatDateVN(stats.since)}.` : "Chưa có sự kiện nào (cần chạy SQL 20250916 và deploy)."} Mỗi người mở popup liên tục chỉ tính 1 lần hiển thị mỗi phút; click lặp trong 10 phút chỉ tính 1.
+          {stats.since ? `Dữ liệu sự kiện có từ ${formatDateVN(stats.since)}.` : "Chưa có sự kiện nào kể từ khi bật theo dõi."} Mỗi người mở popup liên tục chỉ tính 1 lần hiển thị mỗi phút; click lặp trong 10 phút chỉ tính 1.
         </p>
       </div>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -84,8 +84,8 @@ export function AffiliateFunnel({ stats, periodLabel }: { stats: AffiliateStats 
                 <YAxis allowDecimals={false} />
                 <Tooltip />
                 <Legend />
-                <Bar dataKey="impressions" name="Hiển thị" fill="#689EC2" />
-                <Bar dataKey="clicks" name="Click" fill="#EE4D2D" />
+                <Bar isAnimationActive={false} dataKey="impressions" name="Hiển thị" fill="#2D74A8" radius={[4, 4, 0, 0]} maxBarSize={28} />
+                <Bar isAnimationActive={false} dataKey="clicks" name="Click" fill="#EE4D2D" radius={[4, 4, 0, 0]} maxBarSize={28} />
               </BarChart>
             </ResponsiveContainer>
           </div>

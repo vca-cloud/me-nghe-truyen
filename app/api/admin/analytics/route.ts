@@ -105,8 +105,11 @@ export async function GET(request: Request) {
     const activeRealByStory = new Map<number, number>()
     const activeSince = Date.now() - 15 * 60 * 1000
     let periodListens = 0
+    const listensByDayMap = new Map<string, number>()
     for (const row of periodLogs.rows) {
       periodListens++
+      const day = vnDay(row.created_at)
+      listensByDayMap.set(day, (listensByDayMap.get(day) || 0) + 1)
       const ip = String(row.ip_address || "").trim()
       if (!ip || ip === "unknown") continue
       listensPerIp.set(ip, (listensPerIp.get(ip) || 0) + 1)
@@ -117,6 +120,20 @@ export async function GET(request: Request) {
       }
     }
     const periodListeners = listensPerIp.size
+    // Điền đủ các ngày không có lượt nghe để trục thời gian liên tục.
+    const listensByDay: { date: string; listens: number }[] = []
+    const days = [...listensByDayMap.keys()].sort()
+    if (days.length) {
+      const startDay = from ? vnDay(from) : days[0]
+      const lastDataOrToday = to ? vnDay(new Date(Date.parse(to) - 1).toISOString()) : vnDay(new Date().toISOString())
+      const cursor = new Date(`${startDay < days[0] ? startDay : days[0]}T00:00:00Z`)
+      const end = new Date(`${lastDataOrToday}T00:00:00Z`)
+      for (let i = 0; cursor <= end && i < 400; i++) {
+        const date = cursor.toISOString().slice(0, 10)
+        listensByDay.push({ date, listens: listensByDayMap.get(date) || 0 })
+        cursor.setUTCDate(cursor.getUTCDate() + 1)
+      }
+    }
     const returningListeners = [...listensPerIp.values()].filter((count) => count > 1).length
 
     const storyTitle = new Map(stories.map((story) => [story.id, story.title]))
@@ -196,6 +213,7 @@ export async function GET(request: Request) {
       },
       stories,
       genreStats,
+      listensByDay,
       affiliateLinks,
       totalClicks,
       affiliate,

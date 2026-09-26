@@ -91,7 +91,11 @@ async function r2Usage() {
   const payload = await response.json().catch(() => null)
   const account = payload?.data?.viewer?.accounts?.[0]
   if (!response.ok || payload?.errors?.length || !account) {
-    return { ...base, connected: false, reason: `Cloudflare trả lỗi: ${payload?.errors?.[0]?.message || response.status}` }
+    const message = String(payload?.errors?.[0]?.message || response.status)
+    const hint = /not authorized|authentication|permission/i.test(message)
+      ? " — token không có quyền với Account ID này: kiểm tra CLOUDFLARE_ACCOUNT_ID (chuỗi 32 ký tự trên URL dash.cloudflare.com/<ID>) và quyền Account Analytics: Read của token."
+      : ""
+    return { ...base, connected: false, reason: `Cloudflare trả lỗi: ${message}${hint}` }
   }
 
   // Lấy bản ghi dung lượng mới nhất của từng bucket rồi cộng lại.

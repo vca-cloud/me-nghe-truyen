@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Download, ExternalLink } from "lucide-react"
 import { toast } from "sonner"
-import { Bar, BarChart, CartesianGrid, Cell, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
+import { Bar, BarChart, CartesianGrid, LabelList, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
 
 type Story = {
   id: number
@@ -42,18 +42,36 @@ type AffiliateLink = {
 
 type DatePreset = "all" | "this-month" | "last-month" | "custom"
 
+// Cặp màu đã qua kiểm tra tương phản và mù màu (nền sáng và tối).
 const REAL_VIEWS_COLOR = "#EE4D2D"
-const FAKE_VIEWS_COLOR = "#689EC2"
-const HIGHLIGHT_COLOR = "#EE4D2D"
+const SECONDARY_COLOR = "#2D74A8"
+const AXIS_TICK = { fill: "currentColor", fontSize: 12 }
 
 const numberValue = (value: unknown) => (Number.isFinite(Number(value)) ? Number(value) : 0)
 
-function ChartCard({ title, children }: { title: string; children: React.ReactNode }) {
+function ChartCard({ title, subtitle, height = 320, className = "", children }: { title: string; subtitle?: string; height?: number; className?: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-xl border bg-card p-4">
-      <h3 className="mb-3 font-semibold">{title}</h3>
-      <div className="h-[320px]">{children}</div>
+    <div className={`rounded-xl border bg-card p-4 ${className}`}>
+      <h3 className="font-semibold">{title}</h3>
+      {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
+      <div className="mt-3 text-muted-foreground" style={{ height }}>{children}</div>
     </div>
+  )
+}
+
+function GenreBarChart({ data, color, name }: { data: { name: string; value: number }[]; color: string; name: string }) {
+  return (
+    <ResponsiveContainer width="100%" height="100%">
+      <BarChart data={data} layout="vertical" margin={{ top: 4, right: 48, bottom: 4, left: 8 }} barCategoryGap={6}>
+        <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="currentColor" strokeOpacity={0.15} />
+        <XAxis type="number" allowDecimals={false} tick={AXIS_TICK} axisLine={false} tickLine={false} />
+        <YAxis type="category" dataKey="name" width={116} tick={AXIS_TICK} axisLine={false} tickLine={false} interval={0} />
+        <Tooltip cursor={{ fill: "currentColor", fillOpacity: 0.06 }} formatter={(value) => [Number(value).toLocaleString("vi-VN"), name]} />
+        <Bar isAnimationActive={false} dataKey="value" name={name} fill={color} radius={[0, 4, 4, 0]} maxBarSize={22}>
+          <LabelList dataKey="value" position="right" formatter={(value: unknown) => Number(value).toLocaleString("vi-VN")} style={{ fill: "currentColor", fontSize: 12 }} />
+        </Bar>
+      </BarChart>
+    </ResponsiveContainer>
   )
 }
 
@@ -62,6 +80,7 @@ export default function AnalyticsPage() {
   const [genreStats, setGenreStats] = useState<GenreStat[]>([])
   const [affiliateLinks, setAffiliateLinks] = useState<AffiliateLink[]>([])
   const [affiliateStats, setAffiliateStats] = useState<AffiliateStats | null>(null)
+  const [listensByDay, setListensByDay] = useState<{ date: string; listens: number }[]>([])
   const [metrics, setMetrics] = useState({
     totalStories: 0,
     totalEpisodes: 0,
@@ -112,6 +131,7 @@ export default function AnalyticsPage() {
         setGenreStats(payload.genreStats || [])
         setAffiliateLinks(payload.affiliateLinks || [])
         setAffiliateStats(payload.affiliate || null)
+        setListensByDay(payload.listensByDay || [])
         setMetrics({
           totalStories: numberValue(payload.metrics?.totalStories),
           totalEpisodes: numberValue(payload.metrics?.totalEpisodes),
@@ -141,39 +161,16 @@ export default function AnalyticsPage() {
     [stories],
   )
   const genreCountData = useMemo(
-    () => genreStats.map((item) => ({ name: item.genre, value: item.stories })),
+    () => genreStats.map((item) => ({ name: item.genre, value: item.stories })).sort((x, y) => y.value - x.value),
     [genreStats],
   )
   const genreRealData = useMemo(
-    () => genreStats.map((item) => ({ name: item.genre, value: item.realViews })),
+    () => genreStats.map((item) => ({ name: item.genre, value: numberValue(item.realViews) })).sort((x, y) => y.value - x.value),
     [genreStats],
   )
-  const viewsChartData = useMemo(
-    () =>
-      genreStats.map((item) => ({
-        genre: item.genre,
-        realViews: numberValue(item.realViews),
-        fakeViews: numberValue(item.fakeViews),
-      })),
-    [genreStats],
-  )
-  const activeChartData = useMemo(
-    () =>
-      genreStats.map((item) => ({
-        genre: item.genre,
-        activeReal: numberValue(item.activeReal),
-        activeFake: numberValue(item.activeFake),
-      })),
-    [genreStats],
-  )
-
-  const maxGenreCount = useMemo(
-    () => Math.max(0, ...genreCountData.map((item) => item.value)),
-    [genreCountData],
-  )
-  const maxGenreReal = useMemo(
-    () => Math.max(0, ...genreRealData.map((item) => item.value)),
-    [genreRealData],
+  const listensChartData = useMemo(
+    () => listensByDay.map((day) => ({ ...day, label: `${day.date.slice(8, 10)}/${day.date.slice(5, 7)}` })),
+    [listensByDay],
   )
 
   const downloadCSV = () => {
@@ -218,8 +215,9 @@ export default function AnalyticsPage() {
   const periodCards = [
     { label: "Lượt nghe thực trong kỳ", value: metrics.periodListens.toLocaleString("vi-VN"), detail: `${logsNote}; trùng IP trong 30 phút chỉ tính 1`, highlight: true },
     { label: "Người nghe (IP) trong kỳ", value: metrics.periodListeners.toLocaleString("vi-VN"), detail: "Số IP khác nhau đã nghe", highlight: false },
-    { label: "Tỷ lệ nghe lại", value: metrics.periodListeners ? `${metrics.retentionRate.toFixed(1)}%` : "—", detail: "IP nghe từ 2 lượt trở lên", highlight: false },
+    { label: "Tỷ lệ nghe lại", value: metrics.periodListeners ? `${metrics.retentionRate.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}%` : "—", detail: "IP nghe từ 2 lượt trở lên", highlight: false },
     { label: "Đang nghe thực", value: metrics.activeRealListeners.toLocaleString("vi-VN"), detail: "IP nghe trong 15 phút gần nhất", highlight: true },
+    { label: "Click affiliate trong kỳ", value: (affiliateStats?.clicks ?? 0).toLocaleString("vi-VN"), detail: affiliateStats?.since ? `Theo dõi từ ${formatDateVN(affiliateStats.since)}` : "Bắt đầu theo dõi từ bản cập nhật mới", highlight: true },
     { label: "Đang nghe (mô phỏng)", value: metrics.activeFakeListeners.toLocaleString("vi-VN"), detail: "Số ngẫu nhiên 15–85, không phải người thật", highlight: false },
   ]
   const renderCards = (cards: typeof catalogCards) => (
@@ -273,74 +271,31 @@ export default function AnalyticsPage() {
         <section className="space-y-4">
           <h2 className="text-lg font-semibold">2. Biểu đồ</h2>
           <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-            <ChartCard title="Lượt nghe thực vs ảo theo thể loại">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={viewsChartData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="genre" />
-                  <YAxis yAxisId="real" orientation="left" allowDecimals={false} />
-                  <YAxis yAxisId="fake" orientation="right" allowDecimals={false} />
-                  <Tooltip cursor={false} />
-                  <Legend />
-                  <Bar yAxisId="real" dataKey="realViews" fill={REAL_VIEWS_COLOR} name="Lượt nghe thực" minPointSize={4} />
-                  <Bar yAxisId="fake" dataKey="fakeViews" fill={FAKE_VIEWS_COLOR} name="Lượt nghe ảo" />
-                </BarChart>
-              </ResponsiveContainer>
+            <ChartCard
+              className="xl:col-span-2"
+              title={`Lượt nghe thực theo ngày: ${periodLabel}`}
+              subtitle={metrics.logsSince ? `Theo giờ Việt Nam; dữ liệu có từ ${formatDateVN(metrics.logsSince)}` : "Chưa có log lượt nghe"}
+              height={260}
+            >
+              {listensChartData.length === 0 ? <p className="text-sm">Chưa có lượt nghe trong kỳ này.</p> : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={listensChartData} margin={{ top: 16, right: 8, bottom: 0, left: -16 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="currentColor" strokeOpacity={0.15} />
+                    <XAxis dataKey="label" tick={AXIS_TICK} axisLine={false} tickLine={false} minTickGap={12} />
+                    <YAxis allowDecimals={false} tick={AXIS_TICK} axisLine={false} tickLine={false} />
+                    <Tooltip cursor={{ fill: "currentColor", fillOpacity: 0.06 }} labelFormatter={(label) => `Ngày ${label}`} formatter={(value) => [Number(value).toLocaleString("vi-VN"), "Lượt nghe thực"]} />
+                    <Bar isAnimationActive={false} dataKey="listens" name="Lượt nghe thực" fill={REAL_VIEWS_COLOR} radius={[4, 4, 0, 0]} maxBarSize={36} />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
             </ChartCard>
 
-            <ChartCard title="Đang nghe thực vs ảo theo thể loại">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={activeChartData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="genre" />
-                  <YAxis yAxisId="activeReal" orientation="left" allowDecimals={false} />
-                  <YAxis yAxisId="activeFake" orientation="right" allowDecimals={false} />
-                  <Tooltip cursor={false} />
-                  <Legend />
-                  <Bar yAxisId="activeReal" dataKey="activeReal" fill={REAL_VIEWS_COLOR} name="Đang nghe thực" minPointSize={4} />
-                  <Bar yAxisId="activeFake" dataKey="activeFake" fill={FAKE_VIEWS_COLOR} name="Đang nghe ảo" />
-                </BarChart>
-              </ResponsiveContainer>
+            <ChartCard title="Lượt nghe thực theo thể loại" subtitle="Toàn thời gian; truyện nhiều thể loại được tính cho mỗi thể loại" height={Math.max(160, genreRealData.length * 34 + 16)}>
+              <GenreBarChart data={genreRealData} color={REAL_VIEWS_COLOR} name="Lượt nghe thực" />
             </ChartCard>
 
-            <ChartCard title="Phân bố thể loại theo số truyện">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={genreCountData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
-                  <YAxis allowDecimals={false} />
-                  <Tooltip cursor={false} />
-                  <Legend />
-                  <Bar dataKey="value" name="Số truyện">
-                    {genreCountData.map((item) => (
-                      <Cell
-                        key={`count-${item.name}`}
-                        fill={item.value === maxGenreCount ? HIGHLIGHT_COLOR : FAKE_VIEWS_COLOR}
-                      />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </ChartCard>
-
-            <ChartCard title="Phân bố thể loại theo lượt nghe thực">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={genreRealData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
-                  <YAxis allowDecimals={false} />
-                  <Tooltip cursor={false} />
-                  <Legend />
-                  <Bar dataKey="value" name="Lượt nghe thực">
-                    {genreRealData.map((item) => (
-                      <Cell
-                        key={`real-${item.name}`}
-                        fill={item.value === maxGenreReal ? HIGHLIGHT_COLOR : FAKE_VIEWS_COLOR}
-                      />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+            <ChartCard title="Số truyện theo thể loại" subtitle="Toàn bộ danh mục" height={Math.max(160, genreCountData.length * 34 + 16)}>
+              <GenreBarChart data={genreCountData} color={SECONDARY_COLOR} name="Số truyện" />
             </ChartCard>
           </div>
         </section>
