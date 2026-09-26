@@ -54,9 +54,10 @@ async function supabaseUsage() {
 }
 
 async function r2Usage() {
-  const token = process.env.CLOUDFLARE_API_TOKEN
-  const accountId = process.env.CLOUDFLARE_ACCOUNT_ID
-  const bucket = process.env.R2_BUCKET_NAME || undefined
+  // trim(): giá trị dán vào Vercel hay dính khoảng trắng/xuống dòng làm Account ID không khớp.
+  const token = process.env.CLOUDFLARE_API_TOKEN?.trim()
+  const accountId = process.env.CLOUDFLARE_ACCOUNT_ID?.trim()
+  const bucket = process.env.R2_BUCKET_NAME?.trim() || undefined
   const base = { limits: { storageBytes: LIMITS.r2StorageBytes, classA: LIMITS.r2ClassA, classB: LIMITS.r2ClassB }, dashboardUrl: accountId ? `https://dash.cloudflare.com/${accountId}/r2/overview` : "https://dash.cloudflare.com/?to=/:account/r2/overview" }
   if (!token || !accountId) return { ...base, connected: false, reason: "Chưa đặt CLOUDFLARE_API_TOKEN và CLOUDFLARE_ACCOUNT_ID trên Vercel." }
 
@@ -92,9 +93,14 @@ async function r2Usage() {
   const account = payload?.data?.viewer?.accounts?.[0]
   if (!response.ok || payload?.errors?.length || !account) {
     const message = String(payload?.errors?.[0]?.message || response.status)
-    const hint = /not authorized|authentication|permission/i.test(message)
-      ? " — token không có quyền với Account ID này: kiểm tra CLOUDFLARE_ACCOUNT_ID (chuỗi 32 ký tự trên URL dash.cloudflare.com/<ID>) và quyền Account Analytics: Read của token."
-      : ""
+    let hint = ""
+    if (/not authorized|authentication|permission/i.test(message)) {
+      const verify = await fetch("https://api.cloudflare.com/client/v4/user/tokens/verify", { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" })
+        .then((res) => res.json()).catch(() => null)
+      const tokenState = verify?.success ? `token còn hiệu lực (${verify.result?.status ?? "active"})` : "token KHÔNG hợp lệ hoặc đã bị xóa, hãy tạo token mới"
+      const masked = `${accountId.slice(0, 4)}…${accountId.slice(-4)} (${accountId.length} ký tự${/^[0-9a-f]{32}$/i.test(accountId) ? "" : ", KHÔNG đúng dạng 32 ký tự 0-9a-f"})`
+      hint = ` — ${tokenState}; Account ID đang cài: ${masked}. Đối chiếu với chuỗi 32 ký tự trên URL dash.cloudflare.com/<ID> và bảo đảm token có quyền Account Analytics: Read cho đúng tài khoản đó.`
+    }
     return { ...base, connected: false, reason: `Cloudflare trả lỗi: ${message}${hint}` }
   }
 
