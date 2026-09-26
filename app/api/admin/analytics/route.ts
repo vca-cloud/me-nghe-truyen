@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { hasAdminSession } from "@/lib/admin-auth"
-import { createClient } from "@supabase/supabase-js"
+import { createClient, type SupabaseClient } from "@supabase/supabase-js"
+import { fakeViewsFor, realViewsFor } from "@/lib/story-views"
 
 export const dynamic = "force-dynamic"
 
@@ -21,10 +22,25 @@ const toNumber = (value: unknown) => {
 }
 
 const randomBetween = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min
-const legacyFakeViews = (storyId: number) => storyId === 1 ? 10312 : storyId === 2 ? 5960 : randomBetween(1500, 15000)
 const genresOf = (value: unknown) => {
   const genres = String(value || "Khác").split(",").map((item) => item.trim()).filter(Boolean)
   return genres.length ? genres : ["Khác"]
+}
+
+type LogRow = { ip_address: string | null; story_id: number | null; created_at: string }
+
+// PostgREST trả tối đa 1000 dòng mỗi lần; đọc theo trang để không bỏ sót log.
+async function fetchAllLogs(db: SupabaseClient, from: string | null, to: string | null) {
+  const rows: LogRow[] = []
+  for (let offset = 0; ; offset += 1000) {
+    let query = db.from("listener_logs").select("ip_address, story_id, created_at").order("id").range(offset, offset + 999)
+    if (from) query = query.gte("created_at", from)
+    if (to) query = query.lt("created_at", to)
+    const { data, error } = await query
+    if (error) return { rows, error }
+    rows.push(...((data || []) as LogRow[]))
+    if (!data || data.length < 1000) return { rows, error: null }
+  }
 }
 
 export async function GET(request: Request) {
@@ -39,45 +55,30 @@ export async function GET(request: Request) {
 
   try {
     const db = createClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } })
-    let storiesQuery = db.from("stories").select("*").order("id", { ascending: true })
-    let episodesQuery = db.from("episodes").select("id", { count: "exact", head: true })
-    let membersQuery = db.from("admin_users").select("auth_id", { count: "exact", head: true })
-    let linksQuery = db.from("affiliate_links").select("*").order("clicks", { ascending: false })
-
-    if (from) {
-      storiesQuery = storiesQuery.gte("created_at", from)
-      episodesQuery = episodesQuery.gte("created_at", from)
-      membersQuery = membersQuery.gte("created_at", from)
-      linksQuery = linksQuery.gte("created_at", from)
-    }
-    if (to) {
-      storiesQuery = storiesQuery.lt("created_at", to)
-      episodesQuery = episodesQuery.lt("created_at", to)
-      membersQuery = membersQuery.lt("created_at", to)
-      linksQuery = linksQuery.lt("created_at", to)
-    }
-
-    const [storiesResult, episodesResult, membersResult, linksResult] = await Promise.all([
-      storiesQuery,
-      episodesQuery,
-      membersQuery,
-      linksQuery,
+    // Danh mục (truyện, tập, thành viên, affiliate) luôn là toàn bộ; bộ lọc ngày chỉ áp dụng cho log lượt nghe.
+    const [storiesResult, episodesResult, membersResult, linksResult, periodLogs, firstLogResult] = await Promise.all([
+      db.from("stories").select("*").order("id", { ascending: true }),
+      db.from("episodes").select("id", { count: "exact", head: true }),
+      db.from("admin_users").select("auth_id", { count: "exact", head: true }),
+      db.from("affiliate_links").select("*").order("clicks", { ascending: false }),
+      fetchAllLogs(db, from, to),
+      db.from("listener_logs").select("created_at").order("created_at", { ascending: true }).limit(1),
     ])
 
     if (storiesResult.error) throw new Error(`stories: ${storiesResult.error.message}`)
     if (episodesResult.error) throw new Error(`episodes: ${episodesResult.error.message}`)
     if (membersResult.error) throw new Error(`admin_users: ${membersResult.error.message}`)
     if (linksResult.error) throw new Error(`affiliate_links: ${linksResult.error.message}`)
+    if (periodLogs.error) console.warn("listener_logs unavailable:", periodLogs.error.message)
 
-    // Do not mutate the database here. Analytics must reflect the stored values.
     const stories: Story[] = (storiesResult.data || []).map((story: Row) => ({
       id: toNumber(story.id),
       title: String(story.title || ""),
       genre: story.genre == null ? null : String(story.genre),
       description: story.description == null ? null : String(story.description),
       status: story.status == null ? null : String(story.status),
-      realViews: toNumber(story.real_views || story.plays || 0),
-      fakeViews: toNumber(story.base_fake_views) || legacyFakeViews(toNumber(story.id)),
+      realViews: realViewsFor(story),
+      fakeViews: fakeViewsFor(story),
     }))
 
     const affiliateLinks = (linksResult.data || []).map((link: Row) => ({
@@ -90,35 +91,24 @@ export async function GET(request: Request) {
     }))
     const totalClicks = affiliateLinks.reduce((sum, link) => sum + link.clicks, 0)
 
-    const uniqueIps = new Set<string>()
-    let returningIps = 0
-    let activeRealListeners = 0
+    const listensPerIp = new Map<string, number>()
+    const activeIps = new Set<string>()
     const activeRealByStory = new Map<number, number>()
-    let logsQuery = db.from("listener_logs").select("ip_address, story_id, created_at")
-    if (from) logsQuery = logsQuery.gte("created_at", from)
-    if (to) logsQuery = logsQuery.lt("created_at", to)
-    const logsResult = await logsQuery
-
-    if (!logsResult.error) {
-      const counts = new Map<string, number>()
-      const activeIps = new Set<string>()
-      const activeSince = Date.now() - 15 * 60 * 1000
-      for (const row of (logsResult.data || []) as Array<{ ip_address?: string | null; story_id?: number | null; created_at?: string | null }>) {
-        const ip = String(row.ip_address || "").trim()
-        if (!ip || ip === "unknown") continue
-        uniqueIps.add(ip)
-        counts.set(ip, (counts.get(ip) || 0) + 1)
-        if (row.created_at && Date.parse(row.created_at) >= activeSince) {
-          activeIps.add(ip)
-          const storyId = toNumber(row.story_id)
-          if (storyId) activeRealByStory.set(storyId, (activeRealByStory.get(storyId) || 0) + 1)
-        }
+    const activeSince = Date.now() - 15 * 60 * 1000
+    let periodListens = 0
+    for (const row of periodLogs.rows) {
+      periodListens++
+      const ip = String(row.ip_address || "").trim()
+      if (!ip || ip === "unknown") continue
+      listensPerIp.set(ip, (listensPerIp.get(ip) || 0) + 1)
+      if (Date.parse(row.created_at) >= activeSince) {
+        activeIps.add(ip)
+        const storyId = toNumber(row.story_id)
+        if (storyId) activeRealByStory.set(storyId, (activeRealByStory.get(storyId) || 0) + 1)
       }
-      returningIps = [...counts.values()].filter((count) => count > 1).length
-      activeRealListeners = Math.min(5, activeIps.size)
-    } else {
-      console.warn("listener_logs unavailable; IP metrics default to zero:", logsResult.error.message)
     }
+    const periodListeners = listensPerIp.size
+    const returningListeners = [...listensPerIp.values()].filter((count) => count > 1).length
 
     const realViews = stories.reduce((sum, story) => sum + story.realViews, 0)
     const fakeViews = stories.reduce((sum, story) => sum + story.fakeViews, 0)
@@ -150,13 +140,16 @@ export async function GET(request: Request) {
         totalStories: stories.length,
         totalEpisodes: episodesResult.count || 0,
         totalMembers: membersResult.count || 0,
-        totalVisits: uniqueIps.size,
         realViews,
         fakeViews,
-        activeRealListeners,
+        periodListens,
+        periodListeners,
+        activeRealListeners: activeIps.size,
         activeFakeListeners,
-        affiliateRate: realViews ? totalClicks / realViews * 100 : 0,
-        retentionRate: uniqueIps.size ? returningIps / uniqueIps.size * 100 : 0,
+        totalClicks,
+        clicksPerRealView: realViews ? totalClicks / realViews : 0,
+        retentionRate: periodListeners ? returningListeners / periodListeners * 100 : 0,
+        logsSince: firstLogResult.data?.[0]?.created_at ?? null,
       },
       stories,
       genreStats,

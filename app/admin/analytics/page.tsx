@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { formatDateVN } from "@/lib/utils"
 import { AdminShell } from "@/components/admin/admin-shell"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -62,13 +63,16 @@ export default function AnalyticsPage() {
     totalStories: 0,
     totalEpisodes: 0,
     totalMembers: 0,
-    totalVisits: 0,
     realViews: 0,
     fakeViews: 0,
+    periodListens: 0,
+    periodListeners: 0,
     activeRealListeners: 0,
     activeFakeListeners: 0,
-    affiliateRate: 0,
+    totalClicks: 0,
+    clicksPerRealView: 0,
     retentionRate: 0,
+    logsSince: null as string | null,
   })
   const [datePreset, setDatePreset] = useState<DatePreset>("all")
   const [customDate, setCustomDate] = useState("")
@@ -108,13 +112,16 @@ export default function AnalyticsPage() {
           totalStories: numberValue(payload.metrics?.totalStories),
           totalEpisodes: numberValue(payload.metrics?.totalEpisodes),
           totalMembers: numberValue(payload.metrics?.totalMembers),
-          totalVisits: numberValue(payload.metrics?.totalVisits),
           realViews: numberValue(payload.metrics?.realViews),
           fakeViews: numberValue(payload.metrics?.fakeViews),
+          periodListens: numberValue(payload.metrics?.periodListens),
+          periodListeners: numberValue(payload.metrics?.periodListeners),
           activeRealListeners: numberValue(payload.metrics?.activeRealListeners),
           activeFakeListeners: numberValue(payload.metrics?.activeFakeListeners),
-          affiliateRate: numberValue(payload.metrics?.affiliateRate),
+          totalClicks: numberValue(payload.metrics?.totalClicks),
+          clicksPerRealView: numberValue(payload.metrics?.clicksPerRealView),
           retentionRate: numberValue(payload.metrics?.retentionRate),
+          logsSince: typeof payload.metrics?.logsSince === "string" ? payload.metrics.logsSince : null,
         })
       } catch (error) {
         toast.error(error instanceof Error ? error.message : "Lỗi tải dữ liệu analytics")
@@ -168,7 +175,7 @@ export default function AnalyticsPage() {
   const downloadCSV = () => {
     const rows = [
       ["ID", "Tên truyện", "Thể loại", "Real Views", "Fake Views", "Total Views"],
-      ...storyTop5.map((story) => [
+      ...[...stories].sort((a, b) => b.realViews + b.fakeViews - (a.realViews + a.fakeViews)).map((story) => [
         story.id,
         story.title,
         story.genre || "",
@@ -194,18 +201,34 @@ export default function AnalyticsPage() {
     )
   }
 
-  const metricCards = [
-    { label: "Tổng truyện", value: metrics.totalStories.toLocaleString(), detail: "Count stories", highlight: false },
-    { label: "Tổng tập", value: metrics.totalEpisodes.toLocaleString(), detail: "Count episodes", highlight: false },
-    { label: "Tổng thành viên", value: metrics.totalMembers.toLocaleString(), detail: "Count users", highlight: false },
-    { label: "Tổng lượt truy cập", value: metrics.totalVisits.toLocaleString(), detail: "Unique IPs", highlight: false },
-    { label: "Lượt nghe thực", value: metrics.realViews.toLocaleString(), detail: "SUM realViews", highlight: true },
-    { label: "Lượt nghe ảo", value: metrics.fakeViews.toLocaleString(), detail: "SUM fakeViews", highlight: false },
-    { label: "Đang nghe thực", value: metrics.activeRealListeners.toLocaleString(), detail: "15 phút gần nhất", highlight: true },
-    { label: "Đang nghe ảo", value: metrics.activeFakeListeners.toLocaleString(), detail: "Social proof 15–85", highlight: false },
-    { label: "Tỷ lệ nhấp Affiliate", value: `${metrics.affiliateRate.toFixed(2)}%`, detail: "Clicks / real views", highlight: true },
-    { label: "Tỷ lệ quay lại", value: `${metrics.retentionRate.toFixed(2)}%`, detail: "IP xuất hiện > 1 lần", highlight: true },
+  const periodLabel = datePreset === "all" ? "toàn thời gian" : datePreset === "this-month" ? "tháng này" : datePreset === "last-month" ? "tháng trước" : customDate ? `ngày ${formatDateVN(`${customDate}T12:00:00`)}` : "ngày đã chọn"
+  const logsNote = metrics.logsSince ? `Log IP có từ ${formatDateVN(metrics.logsSince)}` : "Chưa có log IP"
+  const catalogCards = [
+    { label: "Tổng truyện", value: metrics.totalStories.toLocaleString("vi-VN"), detail: "Toàn bộ truyện", highlight: false },
+    { label: "Tổng tập", value: metrics.totalEpisodes.toLocaleString("vi-VN"), detail: "Toàn bộ tập", highlight: false },
+    { label: "Tổng thành viên", value: metrics.totalMembers.toLocaleString("vi-VN"), detail: "Tài khoản đã đồng bộ", highlight: false },
+    { label: "Lượt nghe thực", value: metrics.realViews.toLocaleString("vi-VN"), detail: "Toàn thời gian (real_views)", highlight: true },
+    { label: "Lượt nghe ảo", value: metrics.fakeViews.toLocaleString("vi-VN"), detail: "Toàn thời gian (base_fake_views)", highlight: false },
+    { label: "Tổng click affiliate", value: metrics.totalClicks.toLocaleString("vi-VN"), detail: `≈ ${metrics.clicksPerRealView.toLocaleString("vi-VN", { maximumFractionDigits: 2 })} click / lượt nghe thực`, highlight: true },
   ]
+  const periodCards = [
+    { label: "Lượt nghe thực trong kỳ", value: metrics.periodListens.toLocaleString("vi-VN"), detail: `${logsNote}; trùng IP trong 30 phút chỉ tính 1`, highlight: true },
+    { label: "Người nghe (IP) trong kỳ", value: metrics.periodListeners.toLocaleString("vi-VN"), detail: "Số IP khác nhau đã nghe", highlight: false },
+    { label: "Tỷ lệ nghe lại", value: metrics.periodListeners ? `${metrics.retentionRate.toFixed(1)}%` : "—", detail: "IP nghe từ 2 lượt trở lên", highlight: false },
+    { label: "Đang nghe thực", value: metrics.activeRealListeners.toLocaleString("vi-VN"), detail: "IP nghe trong 15 phút gần nhất", highlight: true },
+    { label: "Đang nghe (mô phỏng)", value: metrics.activeFakeListeners.toLocaleString("vi-VN"), detail: "Số ngẫu nhiên 15–85, không phải người thật", highlight: false },
+  ]
+  const renderCards = (cards: typeof catalogCards) => (
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+      {cards.map((card) => (
+        <div key={card.label} className="rounded-xl border bg-card p-4">
+          <p className="text-sm text-muted-foreground">{card.label}</p>
+          <p className={`mt-2 text-2xl font-bold ${card.highlight ? "text-[#EE4D2D]" : "text-foreground"}`}>{card.value}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{card.detail}</p>
+        </div>
+      ))}
+    </div>
+  )
 
   return (
     <AdminShell>
@@ -213,7 +236,7 @@ export default function AnalyticsPage() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="text-2xl font-bold">Thống kê &amp; Báo cáo</h1>
-            <p className="text-sm text-muted-foreground">Dữ liệu realtime từ Supabase service role</p>
+            <p className="text-sm text-muted-foreground">Bộ lọc thời gian áp dụng cho mục &quot;Lượt nghe theo kỳ&quot;; tổng quan và biểu đồ tính trên toàn thời gian.</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <select
@@ -237,18 +260,10 @@ export default function AnalyticsPage() {
         </div>
 
         <section className="space-y-4">
-          <h2 className="text-lg font-semibold">1. Bảng thông số</h2>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
-            {metricCards.map((card) => (
-              <div key={card.label} className="rounded-xl border bg-card p-4">
-                <p className="text-sm text-muted-foreground">{card.label}</p>
-                <p className={`mt-2 text-2xl font-bold ${card.highlight ? "text-[#EE4D2D]" : "text-foreground"}`}>
-                  {card.value}
-                </p>
-                <p className="mt-1 text-xs text-muted-foreground">{card.detail}</p>
-              </div>
-            ))}
-          </div>
+          <h2 className="text-lg font-semibold">1. Tổng quan (toàn thời gian)</h2>
+          {renderCards(catalogCards)}
+          <h2 className="pt-2 text-lg font-semibold">Lượt nghe theo kỳ: {periodLabel}</h2>
+          {renderCards(periodCards)}
         </section>
 
         <section className="space-y-4">

@@ -81,7 +81,7 @@ components/
 ├── login-form.tsx, signup-form.tsx, theme-toggle.tsx
 ├── AffiliateModal.tsx, image-with-fallback.tsx
 ├── account/account-page.tsx
-├── admin/                             # admin-shell, admin-stats, action-buttons, audio-form(-dialog),
+├── admin/                             # admin-shell, action-buttons, audio-form-dialog,
 │                                      # affiliate-manager, category-manager, import-stories-dialog
 ├── track/{player,episode-list,track-actions,track-experience}.tsx
 └── ui/                                # shadcn/ui primitives
@@ -109,6 +109,8 @@ total views = real_views + base_fake_views
 ```
 
 `base_fake_views` có thể fallback từ `plays` legacy ở lớp normalize/API; `plays` không được cộng thêm nếu đã dùng `base_fake_views`. Không tự đồng bộ ngược các giá trị view trừ khi code/migration nói rõ.
+
+Dashboard `/admin/analytics` (`app/api/admin/analytics/route.ts`): phần **tổng quan** (truyện, tập, thành viên, `real_views`/`base_fake_views` qua `lib/story-views.ts`, tổng click affiliate) luôn là toàn thời gian; bộ lọc ngày chỉ áp dụng cho **lượt nghe theo kỳ** tính từ `listener_logs` (đọc phân trang, có từ 2026-09-24). Không dùng tỷ lệ click/lượt nghe dạng %: nghe bắt buộc qua affiliate nên chỉ số này luôn ≥100%; hiển thị tổng click và click trung bình mỗi lượt nghe thực. "Đang nghe (mô phỏng)" là số ngẫu nhiên, phải ghi rõ trên UI. Đăng xuất admin gọi `POST /api/admin/logout` để xóa cookie.
 
 `real_views` được tăng bởi `/api/increment-views` sau luồng mở khóa audio và ghi `listener_logs` theo IP. Analytics phải dùng cùng mô hình tổng view; khi thay đổi mô hình cần rà soát `lib/story-views.ts`, trang chủ, track và admin analytics cùng lúc.
 

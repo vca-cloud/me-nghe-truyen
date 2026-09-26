@@ -1,3 +1,5 @@
+"use client"
+
 import NextLink from "next/link"
 import {
   BookOpen,
@@ -55,9 +57,16 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
           <NextLink href="/" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-muted">
             <BookOpen className="h-4 w-4" /> Về trang nghe truyện
           </NextLink>
-          <NextLink href="/login" className="mt-1 flex items-center gap-3 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-muted">
+          <button
+            type="button"
+            onClick={async () => {
+              await fetch("/api/admin/logout", { method: "POST" }).catch(() => undefined)
+              window.location.assign("/admin/login")
+            }}
+            className="mt-1 flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm text-muted-foreground hover:bg-muted"
+          >
             <LogOut className="h-4 w-4" /> Đăng xuất
-          </NextLink>
+          </button>
         </div>
       </aside>
 
