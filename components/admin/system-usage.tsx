@@ -95,7 +95,7 @@ export function SystemUsage() {
     <section className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold">5. Tài nguyên hệ thống</h2>
+          <h2 className="text-lg font-semibold">6. Tài nguyên hệ thống</h2>
           <p className="text-sm text-muted-foreground">
             So với hạn mức gói miễn phí. {data ? `Cập nhật lúc ${new Date(data.checkedAt).toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" })}, lưu tạm 1 giờ.` : ""}
           </p>

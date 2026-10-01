@@ -60,25 +60,29 @@ export async function GET(request: Request) {
   try {
     const db = createClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } })
     // Danh mục (truyện, tập, thành viên, affiliate) luôn là toàn bộ; bộ lọc ngày chỉ áp dụng cho log lượt nghe.
-    const [storiesResult, episodesResult, membersResult, linksResult, periodLogs, firstLogResult] = await Promise.all([
+    const [storiesResult, episodesResult, membersResult, linksResult, allLogs, firstLogResult] = await Promise.all([
       db.from("stories").select("*").order("id", { ascending: true }),
       db.from("episodes").select("id", { count: "exact", head: true }),
       db.from("admin_users").select("auth_id", { count: "exact", head: true }),
       db.from("affiliate_links").select("*").order("clicks", { ascending: false }),
-      fetchAllRows<LogRow>(db, "listener_logs", "ip_address, story_id, created_at", from, to),
+      fetchAllRows<LogRow>(db, "listener_logs", "ip_address, story_id, created_at", null, null),
       db.from("listener_logs").select("created_at").order("created_at", { ascending: true }).limit(1),
     ])
-    const [affiliateEvents, firstEventResult] = await Promise.all([
-      fetchAllRows<AffiliateEventRow>(db, "affiliate_events", "event, link_id, story_id, visitor_hash, created_at", from, to),
+    const [allEvents, firstEventResult] = await Promise.all([
+      fetchAllRows<AffiliateEventRow>(db, "affiliate_events", "event, link_id, story_id, visitor_hash, created_at", null, null),
       db.from("affiliate_events").select("created_at").order("created_at", { ascending: true }).limit(1),
     ])
-    if (affiliateEvents.error) console.warn("affiliate_events unavailable:", affiliateEvents.error.message)
+    if (allEvents.error) console.warn("affiliate_events unavailable:", allEvents.error.message)
 
     if (storiesResult.error) throw new Error(`stories: ${storiesResult.error.message}`)
     if (episodesResult.error) throw new Error(`episodes: ${episodesResult.error.message}`)
     if (membersResult.error) throw new Error(`admin_users: ${membersResult.error.message}`)
     if (linksResult.error) throw new Error(`affiliate_links: ${linksResult.error.message}`)
-    if (periodLogs.error) console.warn("listener_logs unavailable:", periodLogs.error.message)
+    if (allLogs.error) console.warn("listener_logs unavailable:", allLogs.error.message)
+    // Đọc toàn bộ một lần: báo cáo theo tháng cần mọi tháng, số liệu theo kỳ lọc lại trong bộ nhớ.
+    const inPeriod = (iso: string) => (!from || iso >= from) && (!to || iso < to)
+    const periodLogs = { rows: allLogs.rows.filter((row) => inPeriod(row.created_at)) }
+    const affiliateEvents = { rows: allEvents.rows.filter((row) => inPeriod(row.created_at)) }
 
     const stories: Story[] = (storiesResult.data || []).map((story: Row) => ({
       id: toNumber(story.id),
@@ -195,7 +199,116 @@ export async function GET(request: Request) {
       activeFake: Math.max(0, Math.round(activeFakeListeners * value.stories / Math.max(1, stories.length))),
     })).sort((a, b) => b.realViews + b.fakeViews - a.realViews - a.fakeViews)
 
+    // ===== Báo cáo chi tiết =====
+    const storyById = new Map(stories.map((story) => [story.id, story]))
+    const vnMonth = (iso: string) => vnDay(iso).slice(0, 7)
+    const currentMonth = vnMonth(new Date().toISOString())
+    const prevMonthDate = new Date(`${currentMonth}-01T00:00:00Z`)
+    prevMonthDate.setUTCMonth(prevMonthDate.getUTCMonth() - 1)
+    const previousMonth = prevMonthDate.toISOString().slice(0, 7)
+    // Tháng đang diễn ra so với cùng số ngày đầu của tháng trước (so sánh cùng kỳ).
+    const todayDay = Number(vnDay(new Date().toISOString()).slice(8, 10))
+    const isSamePeriodOfPrevMonth = (iso: string) => vnMonth(iso) === previousMonth && Number(vnDay(iso).slice(8, 10)) <= todayDay
+    let prevMonthSamePeriod = 0
+
+    // 1) Theo tháng (toàn thời gian, không theo bộ lọc kỳ)
+    const monthly = new Map<string, { listens: number; listeners: Set<string>; impressions: number; clicks: number }>()
+    const monthEntry = (month: string) => {
+      let entry = monthly.get(month)
+      if (!entry) { entry = { listens: 0, listeners: new Set(), impressions: 0, clicks: 0 }; monthly.set(month, entry) }
+      return entry
+    }
+    for (const row of allLogs.rows) {
+      if (isSamePeriodOfPrevMonth(row.created_at)) prevMonthSamePeriod++
+      const entry = monthEntry(vnMonth(row.created_at))
+      entry.listens++
+      if (row.ip_address) entry.listeners.add(row.ip_address)
+    }
+    for (const row of allEvents.rows) {
+      const entry = monthEntry(vnMonth(row.created_at))
+      if (row.event === "click") entry.clicks++
+      else entry.impressions++
+    }
+    const months = [...monthly.keys()].sort()
+    if (months.length && months[months.length - 1] < currentMonth) monthEntry(currentMonth)
+    const monthlyReport = [...monthly.keys()].sort().map((month, index, list) => {
+      const value = monthly.get(month)!
+      const prev = index > 0 ? monthly.get(list[index - 1])! : null
+      const isCurrent = month === currentMonth
+      const base = isCurrent && list[index - 1] === previousMonth ? prevMonthSamePeriod : prev?.listens ?? 0
+      return {
+        month,
+        listens: value.listens,
+        listeners: value.listeners.size,
+        impressions: value.impressions,
+        clicks: value.clicks,
+        conversionRate: value.impressions ? value.clicks / value.impressions * 100 : null,
+        listensChange: prev && base ? (value.listens - base) / base * 100 : null,
+        comparedTo: isCurrent && list[index - 1] === previousMonth ? `${todayDay} ngày đầu ${previousMonth.slice(5, 7)}/${previousMonth.slice(0, 4)}` : null,
+        isCurrentMonth: isCurrent,
+      }
+    })
+
+    // 2) Hiệu quả thể loại
+    const genrePerf = new Map<string, { stories: number; realViewsAll: number; periodListens: number; thisMonth: number; lastMonth: number; impressions: number; clicks: number }>()
+    const genreEntry = (genre: string) => {
+      let entry = genrePerf.get(genre)
+      if (!entry) { entry = { stories: 0, realViewsAll: 0, periodListens: 0, thisMonth: 0, lastMonth: 0, impressions: 0, clicks: 0 }; genrePerf.set(genre, entry) }
+      return entry
+    }
+    for (const story of stories) for (const genre of genresOf(story.genre)) {
+      const entry = genreEntry(genre)
+      entry.stories++
+      entry.realViewsAll += story.realViews
+    }
+    for (const row of allLogs.rows) {
+      const story = row.story_id ? storyById.get(row.story_id) : undefined
+      if (!story) continue
+      const month = vnMonth(row.created_at)
+      for (const genre of genresOf(story.genre)) {
+        const entry = genreEntry(genre)
+        if (inPeriod(row.created_at)) entry.periodListens++
+        if (month === currentMonth) entry.thisMonth++
+        if (isSamePeriodOfPrevMonth(row.created_at)) entry.lastMonth++
+      }
+    }
+    for (const row of affiliateEvents.rows) {
+      const story = row.story_id ? storyById.get(row.story_id) : undefined
+      if (!story) continue
+      for (const genre of genresOf(story.genre)) {
+        const entry = genreEntry(genre)
+        if (row.event === "click") entry.clicks++
+        else entry.impressions++
+      }
+    }
+    const genreReport = [...genrePerf.entries()].map(([genre, value]) => ({
+      genre,
+      ...value,
+      avgPerStory: value.stories ? value.realViewsAll / value.stories : 0,
+      monthChange: value.lastMonth ? (value.thisMonth - value.lastMonth) / value.lastMonth * 100 : null,
+      clickRate: value.impressions ? value.clicks / value.impressions * 100 : null,
+    })).sort((a, b) => b.avgPerStory - a.avgPerStory)
+
+    // 3) Tỷ lệ click affiliate theo truyện (theo kỳ)
+    const storyAff = new Map<number, { impressions: number; clicks: number; listens: number }>()
+    const storyEntry = (id: number) => {
+      let entry = storyAff.get(id)
+      if (!entry) { entry = { impressions: 0, clicks: 0, listens: 0 }; storyAff.set(id, entry) }
+      return entry
+    }
+    for (const row of affiliateEvents.rows) if (row.story_id) {
+      const entry = storyEntry(row.story_id)
+      if (row.event === "click") entry.clicks++
+      else entry.impressions++
+    }
+    for (const row of periodLogs.rows) if (row.story_id) storyEntry(row.story_id).listens++
+    const storyAffiliateReport = stories.map((story) => {
+      const value = storyAff.get(story.id) || { impressions: 0, clicks: 0, listens: 0 }
+      return { id: story.id, title: story.title, genre: story.genre, ...value, clickRate: value.impressions ? value.clicks / value.impressions * 100 : null }
+    })
+
     return NextResponse.json({
+      report: { currentMonth, previousMonth, comparedDays: todayDay, monthly: monthlyReport, genres: genreReport, storyAffiliate: storyAffiliateReport, minImpressionsForRate: 10 },
       metrics: {
         totalStories: stories.length,
         totalEpisodes: episodesResult.count || 0,

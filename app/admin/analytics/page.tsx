@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { DetailedReportSection, type DetailedReport } from "@/components/admin/detailed-report"
 import { AffiliateFunnel, type AffiliateStats } from "@/components/admin/affiliate-funnel"
 import { SystemUsage } from "@/components/admin/system-usage"
 import { formatDateVN } from "@/lib/utils"
@@ -80,6 +81,7 @@ export default function AnalyticsPage() {
   const [genreStats, setGenreStats] = useState<GenreStat[]>([])
   const [affiliateLinks, setAffiliateLinks] = useState<AffiliateLink[]>([])
   const [affiliateStats, setAffiliateStats] = useState<AffiliateStats | null>(null)
+  const [report, setReport] = useState<DetailedReport | null>(null)
   const [listensByDay, setListensByDay] = useState<{ date: string; listens: number }[]>([])
   const [metrics, setMetrics] = useState({
     totalStories: 0,
@@ -131,6 +133,7 @@ export default function AnalyticsPage() {
         setGenreStats(payload.genreStats || [])
         setAffiliateLinks(payload.affiliateLinks || [])
         setAffiliateStats(payload.affiliate || null)
+        setReport(payload.report || null)
         setListensByDay(payload.listensByDay || [])
         setMetrics({
           totalStories: numberValue(payload.metrics?.totalStories),
@@ -370,6 +373,8 @@ export default function AnalyticsPage() {
         </section>
 
         <AffiliateFunnel stats={affiliateStats} periodLabel={periodLabel} />
+
+        <DetailedReportSection report={report} periodLabel={periodLabel} />
 
         <SystemUsage />
       </div>
