@@ -118,9 +118,10 @@ export function AffiliateModal({ isOpen, onClose, onUnlock, storyId, storyTitle,
         <div className="px-6 pb-6 pt-5 text-center">
           {error ? <p className="text-muted-foreground">{error}</p> : (
             <>
-              <h2 id="affiliate-title" className="text-2xl font-bold text-foreground">Nghe miễn phí, chỉ cần 1 chạm</h2>
-              <p className="mt-2 text-[15px] leading-6 text-muted-foreground">
-                <BrandName /> duy trì nhờ link Shopee. Bạn chỉ cần bấm mở link, <strong className="text-foreground">không cần mua gì</strong>, rồi quay lại là nghe ngay.
+              <h2 id="affiliate-title" className="text-2xl font-bold text-foreground [text-wrap:balance]">Nghe miễn phí, chỉ cần 1 chạm</h2>
+              {/* Điện thoại: căn đều, dòng cuối căn trái (tránh giãn chữ). Màn rộng: 2 dòng cân bằng rồi căn đều cả 2 dòng. */}
+              <p className="mt-2 text-justify text-[14px] leading-6 text-muted-foreground [text-wrap:pretty] sm:text-[15px] sm:[text-align-last:justify] sm:[text-wrap:balance]">
+                <BrandName /> duy trì nhờ link Shopee. Bạn chỉ cần bấm mở link, <strong className="whitespace-nowrap font-bold text-[#EE4D2D]">không cần mua gì</strong>, rồi quay lại là nghe ngay.
               </p>
               <ul className="mx-auto mt-4 w-fit space-y-1.5 text-left text-[15px] text-foreground">
                 <li><span className="mr-2 font-bold text-[#EE4D2D]">✓</span>Miễn phí toàn bộ truyện</li>
