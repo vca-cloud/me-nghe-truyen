@@ -41,6 +41,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         />
         <Script id="google-tag" strategy="afterInteractive">
           {`
+            // Chỉ đo khách thật: bỏ trang admin và mọi tên miền khác (localhost, bản preview).
+            if (location.hostname !== 'menghetruyen.com' || location.pathname.indexOf('/admin') === 0) {
+              window['ga-disable-${GA_MEASUREMENT_ID}'] = true;
+            }
             window.dataLayer = window.dataLayer || [];
             function gtag(){dataLayer.push(arguments);}
             gtag('js', new Date());

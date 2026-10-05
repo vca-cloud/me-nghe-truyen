@@ -242,6 +242,7 @@ export default function AnalyticsPage() {
           <div>
             <h1 className="text-2xl font-bold">Thống kê &amp; Báo cáo</h1>
             <p className="text-sm text-muted-foreground">Bộ lọc thời gian áp dụng cho mục &quot;Lượt nghe theo kỳ&quot;; tổng quan và biểu đồ tính trên toàn thời gian.</p>
+            <p className="text-sm text-muted-foreground">Trang này đếm <strong>lượt nghe audio</strong> (sau khi mở khóa) và popup affiliate. Google Analytics đếm <strong>lượt truy cập web</strong> (mọi trang, kể cả người không nghe), nên hai nơi luôn khác nhau.</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <select
