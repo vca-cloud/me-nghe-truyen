@@ -31,12 +31,6 @@ interface AudioPlayerProps {
   onPlayStarted?: () => void
   isUnlocked?: boolean
   onShowAffiliate?: () => void
-  /** Số giây được nghe thử khi chưa mở khóa (tính theo thời gian nghe thật, tua không được cộng). */
-  previewSeconds?: number
-  previewUsed?: boolean
-  onPreviewEnd?: () => void
-  /** Gọi khi chưa có link audio: cha lấy link rồi trả về để phát. */
-  onNeedAudio?: () => Promise<boolean>
   storyId?: number
   episodeId?: number | null
 }
@@ -68,10 +62,6 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(funct
     onPlayStarted,
     isUnlocked = false,
     onShowAffiliate,
-    previewSeconds = 60,
-    previewUsed = false,
-    onPreviewEnd,
-    onNeedAudio,
     storyId,
     episodeId = null,
   },
@@ -90,9 +80,6 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(funct
   const [sleepMode, setSleepMode] = useState<SleepMode>(null)
   const [sleepEndsAt, setSleepEndsAt] = useState<number | null>(null)
   const [sleepRemaining, setSleepRemaining] = useState(0)
-  const listenedRef = useRef(0)
-  const lastTickRef = useRef<number | null>(null)
-  const [previewLeft, setPreviewLeft] = useState(previewSeconds)
 
   const saveProgress = async (completed = false, force = false) => {
     if (!storyId || !audioRef.current || !Number.isFinite(duration)) return
@@ -156,22 +143,14 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(funct
   }, [audioUrl, episodeId, storyId])
 
   const togglePlay = () => {
-    const audio = audioRef.current
-    if (!audio) return
-    if (!audio.paused) {
-      audio.pause()
-      return
-    }
-    if (!isUnlocked && previewUsed) {
+    if (!isUnlocked) {
       onShowAffiliate?.()
       return
     }
-    if (!audioUrl && onNeedAudio) {
-      // Link chỉ lấy khi bấm phát; chờ React gắn src mới rồi phát.
-      void onNeedAudio().then((ok) => { if (ok) setTimeout(() => void playAudio(), 120) })
-      return
-    }
-    void playAudio()
+    const audio = audioRef.current
+    if (!audio) return
+    if (audio.paused) void playAudio()
+    else audio.pause()
   }
 
   const seek = (seconds: number) => {
@@ -255,31 +234,17 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(funct
         onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
         onTimeUpdate={(e) => {
           setCurrentTime(e.currentTarget.currentTime)
-          if (!isUnlocked && !e.currentTarget.paused) {
-            const now = e.currentTarget.currentTime
-            const delta = lastTickRef.current == null ? 0 : now - lastTickRef.current
-            lastTickRef.current = now
-            if (delta > 0 && delta < 2) listenedRef.current += delta / (e.currentTarget.playbackRate || 1)
-            const left = Math.max(0, previewSeconds - listenedRef.current)
-            setPreviewLeft(Math.ceil(left))
-            if (left <= 0) {
-              e.currentTarget.pause()
-              trackEvent("preview_end", { story_id: storyId, episode_id: episodeId })
-              onPreviewEnd?.()
-            }
-          }
           const media = e.currentTarget
           if ("mediaSession" in navigator && Number.isFinite(media.duration) && media.duration > 0) {
             try { navigator.mediaSession.setPositionState({ duration: media.duration, position: Math.min(media.currentTime, media.duration), playbackRate: media.playbackRate }) } catch { /* bỏ qua */ }
           }
           if (restoredRef.current && e.currentTarget.currentTime - lastSavedRef.current >= 10) void saveProgress()
         }}
-        onPlay={(e) => {
+        onPlay={() => {
           setIsPlaying(true)
-          lastTickRef.current = e.currentTarget.currentTime
           if (!startedRef.current) {
             startedRef.current = true
-            trackEvent("audio_play", { story_id: storyId, episode_id: episodeId, story_title: title, episode_title: episodeTitle, preview: !isUnlocked })
+            trackEvent("audio_play", { story_id: storyId, episode_id: episodeId, story_title: title, episode_title: episodeTitle })
             onPlayStarted?.()
             void saveProgress(false, true)
           }
@@ -335,11 +300,6 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(funct
         </div>
 
         {error && <p className="text-center text-sm text-destructive">{error}</p>}
-        {!isUnlocked && (
-          <p className="rounded-full bg-[#EE4D2D]/10 px-4 py-1.5 text-center text-sm font-medium text-[#EE4D2D]">
-            {previewUsed ? "Đã hết phần nghe thử — bấm Phát để nghe tiếp miễn phí" : isPlaying ? `Nghe thử: còn ${previewLeft} giây` : `Nghe thử miễn phí ${previewSeconds} giây`}
-          </p>
-        )}
 
         <div className="flex w-full items-center justify-center gap-3 sm:gap-5 md:gap-6">
           <Button variant="ghost" size="icon" aria-label="Bài trước" disabled={!previousTrackId && currentTime <= 3} onClick={handlePrevious} className="h-12 w-12 shrink-0">
