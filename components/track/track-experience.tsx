@@ -41,6 +41,8 @@ export function TrackExperience({
   const [selectedNumber, setSelectedNumber] = useState(availableEpisodes[0]?.episode_number || 1)
   const [showAffiliate, setShowAffiliate] = useState(false)
   const [isUnlocked, setIsUnlocked] = useState(false)
+  // Không ghi nhớ giữa các lần vào trang: mỗi lần mở trang được nghe thử 60s rồi phải bấm link.
+  const [previewUsed, setPreviewUsed] = useState(false)
   const [pendingEpisode, setPendingEpisode] = useState<Episode | null>(null)
   const audioPlayerRef = useRef<AudioPlayerHandle | null>(null)
 
@@ -48,7 +50,7 @@ export function TrackExperience({
   const selectedEpisode = availableEpisodes[selectedIndex] || fallbackEpisode
 
   const selectEpisode = (episode: Episode) => {
-    if (isUnlocked) {
+    if (isUnlocked || !previewUsed) {
       setSelectedNumber(episode.episode_number)
     } else {
       setPendingEpisode(episode)
@@ -62,8 +64,8 @@ export function TrackExperience({
     setShowAffiliate(false)
   }
 
-  const fetchAudioUrls = async () => {
-    const response = await fetch(`/api/track-audio?storyId=${storyId}`, { cache: "no-store" })
+  const fetchAudioUrls = async (preview = false) => {
+    const response = await fetch(`/api/track-audio?storyId=${storyId}${preview ? "&preview=1" : ""}`, { cache: "no-store" })
     if (!response.ok) throw new Error("locked")
     const data = await response.json() as { fallbackAudioUrl: string | null; episodes: { id: number; audio_url: string }[] }
     const urls = { fallback: data.fallbackAudioUrl, byId: Object.fromEntries(data.episodes.map((episode) => [episode.id, episode.audio_url])) }
@@ -88,13 +90,29 @@ export function TrackExperience({
     setTimeout(() => { void audioPlayerRef.current?.playAudio() }, 120)
   }
 
+  const loadPreviewAudio = async () => {
+    try {
+      await fetchAudioUrls(true)
+      return true
+    } catch {
+      toast.error("Không tải được audio, vui lòng thử lại.")
+      return false
+    }
+  }
+
+  const handlePreviewEnd = () => {
+    setPreviewUsed(true)
+    setPendingEpisode(null)
+    setShowAffiliate(true)
+  }
+
   const handleModalClose = () => {
     setShowAffiliate(false)
     setPendingEpisode(null)
   }
 
   useEffect(() => {
-    if (isUnlocked) return
+    if (isUnlocked || !previewUsed) return
 
     const openAffiliateForInteraction = (event: Event) => {
       const target = event.target
@@ -111,7 +129,7 @@ export function TrackExperience({
       document.removeEventListener("click", openAffiliateForInteraction, true)
       document.removeEventListener("touchend", openAffiliateForInteraction, true)
     }
-  }, [isUnlocked, selectedEpisode])
+  }, [isUnlocked, previewUsed, selectedEpisode])
 
   return (
     <>
@@ -128,6 +146,10 @@ export function TrackExperience({
         onEnded={handleEnded}
         isUnlocked={isUnlocked}
         onShowAffiliate={() => setShowAffiliate(true)}
+        previewSeconds={60}
+        previewUsed={previewUsed}
+        onPreviewEnd={handlePreviewEnd}
+        onNeedAudio={loadPreviewAudio}
       />
       <EpisodeList
         episodes={availableEpisodes}
@@ -137,6 +159,9 @@ export function TrackExperience({
       />
       <AffiliateModal
         storyId={storyId}
+        storyTitle={title}
+        episodeLabel={`Tập ${selectedEpisode.episode_number}`}
+        coverUrl={coverUrl}
         isOpen={showAffiliate}
         onClose={handleModalClose}
         onUnlock={() => void handleUnlock()}

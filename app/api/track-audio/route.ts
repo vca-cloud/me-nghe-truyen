@@ -5,11 +5,14 @@ import { createServiceDb } from "@/lib/admin-auth"
 
 export const dynamic = "force-dynamic"
 
-// Link audio chỉ được trả sau khi người nghe đã bấm link affiliate của truyện này (cookie ký bởi route click).
+// Link audio không nằm trong HTML; chỉ lấy qua API khi người nghe bấm phát (nghe thử 60s, preview=1)
+// hoặc sau khi đã bấm link affiliate (cookie ký bởi route click).
 export async function GET(request: Request) {
-  const storyId = Number(new URL(request.url).searchParams.get("storyId"))
+  const params = new URL(request.url).searchParams
+  const storyId = Number(params.get("storyId"))
+  const preview = params.get("preview") === "1"
   if (!Number.isInteger(storyId) || storyId <= 0) return NextResponse.json({ error: "storyId không hợp lệ" }, { status: 400 })
-  if (!isUnlocked((await cookies()).get(AUDIO_UNLOCK_COOKIE)?.value, storyId)) {
+  if (!preview && !isUnlocked((await cookies()).get(AUDIO_UNLOCK_COOKIE)?.value, storyId)) {
     return NextResponse.json({ error: "Cần mở khóa audio trước khi nghe." }, { status: 403 })
   }
 

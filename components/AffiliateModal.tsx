@@ -8,6 +8,9 @@ interface AffiliateModalProps {
   onClose: () => void
   onUnlock: () => void
   storyId?: number
+  storyTitle?: string
+  episodeLabel?: string
+  coverUrl?: string | null
 }
 
 interface ActiveAffiliateLink {
@@ -17,7 +20,7 @@ interface ActiveAffiliateLink {
   image_url: string | null
 }
 
-export function AffiliateModal({ isOpen, onClose, onUnlock, storyId }: AffiliateModalProps) {
+export function AffiliateModal({ isOpen, onClose, onUnlock, storyId, storyTitle, episodeLabel, coverUrl }: AffiliateModalProps) {
   const [link, setLink] = useState<ActiveAffiliateLink | null>(null)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
@@ -97,53 +100,55 @@ export function AffiliateModal({ isOpen, onClose, onUnlock, storyId }: Affiliate
   // Không hiển thị popup tải trước; chỉ render popup Shopee khi link đã sẵn sàng.
   if (!isOpen || loading || !link) return null
 
+  const dismiss = () => {
+    trackEvent("affiliate_dismiss", { link_id: link.id, story_id: storyId })
+    onClose()
+  }
+
   return (
     <div data-affiliate-modal className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-      <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
-        <div className="relative p-6 pb-4">
-          <h2 className="text-center text-2xl font-bold text-gray-900">Mời bạn mở khóa audio</h2>
+      <div role="dialog" aria-modal="true" aria-labelledby="affiliate-title" className="w-full max-w-md overflow-hidden rounded-2xl bg-white text-gray-900 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+        <div className="flex items-center gap-3 border-b bg-[#D4EEED] px-5 py-4">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[#154B95] text-2xl text-white">
+            {coverUrl ? <img src={coverUrl} alt="" className="h-full w-full object-cover" /> : "🎧"}
+          </div>
+          <div className="min-w-0">
+            <p className="truncate font-bold text-[#154B95]">{storyTitle || "Truyện audio"}</p>
+            {episodeLabel && <p className="text-sm text-[#2D74A8]">{episodeLabel}</p>}
+          </div>
         </div>
 
-        <div className="px-6 pb-6 text-center">
-          {loading ? (
-            <p className="text-gray-500">Đang tải link Shopee...</p>
-          ) : error || !link ? (
-            <p className="text-gray-500">{error || "Chưa có link affiliate đang bật."}</p>
-          ) : (
+        <div className="px-6 pb-5 pt-5 text-center">
+          {error ? <p className="text-gray-500">{error}</p> : (
             <>
-              <p className="mb-6 text-lg text-gray-700">
-                Click vào liên kết bên dưới và Mở Ứng Dụng Shopee để mở khóa audio!
+              <h2 id="affiliate-title" className="text-2xl font-bold">Nghe tiếp miễn phí, chỉ cần 1 chạm</h2>
+              <p className="mt-2 text-[15px] leading-6 text-gray-600">
+                <span className="font-semibold"><span className="text-[#EE4D2D]">mê</span> nghe truyện</span> duy trì nhờ link Shopee. Bạn chỉ cần bấm mở link, <strong className="text-gray-900">không cần mua gì</strong>, rồi quay lại là nghe tiếp ngay.
               </p>
-              <div className="mb-6 rounded-xl bg-gray-50 p-4">
-                <div className="flex flex-col items-center gap-3">
-                  <div className="flex h-[200px] w-[200px] items-center justify-center overflow-hidden rounded-lg bg-white shadow-sm">
-                    {link.image_url ? (
-                      <img
-                        src={link.image_url}
-                        alt={link.title}
-                        className="h-full w-full object-cover"
-                        onError={(event) => {
-                          event.currentTarget.style.display = "none"
-                          event.currentTarget.nextElementSibling?.classList.remove("hidden")
-                        }}
-                      />
-                    ) : null}
-                    <span className={`${link.image_url ? "hidden " : ""}text-3xl`}>🎵</span>
-                  </div>
-                  <div className="text-center">
-                    <div className="font-medium text-gray-900">{link.title}</div>
-                    <div className="text-sm font-medium text-green-600">Mở khóa ngay</div>
-                  </div>
-                </div>
-              </div>
+              <ul className="mx-auto mt-4 w-fit space-y-1.5 text-left text-[15px] text-gray-700">
+                <li>✓ Miễn phí toàn bộ truyện</li>
+                <li>✓ Nghe tiếp từ đúng chỗ vừa dừng</li>
+                <li>✓ Không cần đăng ký tài khoản</li>
+              </ul>
               <button
                 onClick={() => void handleUnlockClick()}
                 disabled={submitting}
-                className="w-full rounded-xl bg-orange-500 py-4 text-lg font-bold text-white shadow-lg transition-colors hover:bg-orange-600 disabled:opacity-70"
+                className="mt-5 w-full rounded-xl bg-[#EE4D2D] py-4 text-lg font-bold text-white shadow-lg transition-colors hover:bg-[#d8401f] disabled:opacity-70"
               >
-                MỞ KHÓA & NGHE NGAY
+                ▶ NGHE TIẾP – MIỄN PHÍ
               </button>
-              <p className="mt-4 text-xs text-gray-500">Link sẽ mở trong tab mới</p>
+              <p className="mt-2 text-xs text-gray-500">Shopee mở ở tab mới · Quay lại tab này để nghe</p>
+
+              <div className="mt-4 flex items-center gap-3 rounded-xl bg-gray-50 p-3 text-left">
+                <div className="h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-white">
+                  {link.image_url ? <img src={link.image_url} alt="" className="h-full w-full object-cover" /> : <span className="flex h-full items-center justify-center text-xl">🛍️</span>}
+                </div>
+                <div className="min-w-0 text-sm">
+                  <p className="text-gray-500">Gợi ý hôm nay</p>
+                  <p className="truncate font-medium text-gray-800">{link.title}</p>
+                </div>
+              </div>
+              <button type="button" onClick={dismiss} className="mt-3 text-sm text-gray-500 underline-offset-2 hover:underline">Để sau</button>
             </>
           )}
         </div>
