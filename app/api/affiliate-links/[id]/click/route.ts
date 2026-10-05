@@ -1,4 +1,6 @@
+import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
+import { AUDIO_UNLOCK_COOKIE, addUnlock, unlockCookieOptions } from "@/lib/audio-unlock"
 import { createClient, type SupabaseClient } from "@supabase/supabase-js"
 import { clientIp } from "@/lib/request-ip"
 import { visitorHash } from "@/lib/visitor"
@@ -16,7 +18,7 @@ const CLICK_WINDOW_MS = 10 * 60 * 1000
 // Chặn một IP cộng click liên tục cho cùng link (bộ nhớ theo instance).
 const recentClicks = new Map<string, number>()
 
-export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
+async function handleClick(request: Request, { params }: { params: Promise<{ id: string }> }, storyIdFromBody: number | null) {
   try {
     const { id } = await params
     const linkId = Number(id)
@@ -37,8 +39,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       return NextResponse.json({ error: "Thiếu cấu hình Supabase" }, { status: 500 })
     }
 
-    const body = await request.json().catch(() => null)
-    const storyId = Number(body?.storyId)
+    const storyId = storyIdFromBody ?? NaN
     const { error: eventError } = await db.from("affiliate_events").insert({
       event: "click",
       link_id: linkId,
@@ -73,4 +74,18 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const message = error instanceof Error ? error.message : "Không thể tăng clicks"
     return NextResponse.json({ error: message }, { status: 500 })
   }
+}
+
+// Bấm link thành công → ghi cookie mở khóa truyện để /api/track-audio trả link audio.
+export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
+  const body = await request.json().catch(() => null)
+  const storyId = Number(body?.storyId)
+  const validStory = Number.isInteger(storyId) && storyId > 0 ? storyId : null
+  const response = await handleClick(request, context, validStory)
+  // Ghi cookie kể cả khi lưu thống kê lỗi: người dùng đã bấm link thì không được chặn nghe.
+  if (validStory && response.status !== 400) {
+    const current = (await cookies()).get(AUDIO_UNLOCK_COOKIE)?.value
+    response.cookies.set(AUDIO_UNLOCK_COOKIE, addUnlock(current, validStory), unlockCookieOptions)
+  }
+  return response
 }

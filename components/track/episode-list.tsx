@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Play, Lock } from "lucide-react"
-import type { Episode } from "@/lib/supabase"
+import type { PublicEpisode as Episode } from "@/lib/supabase"
 
 interface EpisodeListProps {
   episodes: Episode[]

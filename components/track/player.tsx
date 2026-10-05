@@ -222,11 +222,15 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(funct
   }, [isPlaying])
 
   return (
-    <div className="flex w-full flex-col gap-6">
+    <div
+      className="flex w-full select-none flex-col gap-6 [-webkit-touch-callout:none]"
+      onContextMenu={(event) => event.preventDefault()}
+    >
       <audio
         ref={audioRef}
-        src={audioUrl}
+        src={audioUrl || undefined}
         preload="metadata"
+        controlsList="nodownload noplaybackrate"
         onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
         onTimeUpdate={(e) => {
           setCurrentTime(e.currentTarget.currentTime)
@@ -261,7 +265,7 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(funct
           onEnded?.()
           if (!onEnded) navigate(nextTrackId)
         }}
-        onError={() => setError("Không tải được file audio từ URL đã cung cấp.")}
+        onError={() => { if (audioUrl) setError("Không tải được file audio, vui lòng thử lại.") }}
       />
 
       <div className="flex w-full flex-col items-center gap-8">

@@ -160,7 +160,7 @@ Trang track là ISR (`revalidate = 60`); `generateStaticParams` build sẵn 12 t
 
 Ảnh bìa dùng `ImageWithFallback`: URL thuộc host `NEXT_PUBLIC_R2_PUBLIC_URL` đi qua `next/image` (khai báo `images.remotePatterns` trong `next.config.ts`), host khác dùng `<img loading="lazy">` để không vỡ ảnh dán thủ công.
 
-`TrackExperience`/`AffiliateModal` yêu cầu hoàn tất affiliate trước khi phát. Link active lấy từ `/api/affiliate-links/active`; click ghi qua `/api/affiliate-links/[id]/click`; preview dùng `/api/affiliate-links/preview`.
+`TrackExperience`/`AffiliateModal` yêu cầu hoàn tất affiliate trước khi phát. **Link audio không được gửi trong HTML/RSC hay `/api/home-stories`**: page truyền `toPublicEpisodes()` (bỏ `audio_url`); route click affiliate ghi cookie ký `mnt_unlock` (`lib/audio-unlock.ts`, 6 giờ, theo từng truyện), rồi `TrackExperience` gọi `GET /api/track-audio?storyId=` (403 nếu chưa mở khóa) để lấy link. Player chặn menu chuột phải/nhấn giữ và `controlsList=nodownload`. Giới hạn đã biết: link R2 vẫn là link công khai cố định (`r2.dev`) và anon key vẫn đọc được `episodes.audio_url` qua Supabase REST; muốn chặn triệt để cần bucket private + URL ký có hạn (đã đề xuất "Mức 2"). Link active lấy từ `/api/affiliate-links/active`; click ghi qua `/api/affiliate-links/[id]/click`; preview dùng `/api/affiliate-links/preview`.
 
 `AudioPlayer` dùng `<audio>` thật, tua, tốc độ 0.75x–2x và tự chuyển tập. Với user đã đăng nhập, player:
 

@@ -9,7 +9,6 @@ export interface HomeStory {
   author: string
   genre: string
   description: string
-  audio_url: string
   cover_url: string | null
   episodes: number
   duration: string
@@ -19,7 +18,7 @@ export interface HomeStory {
   status: string
 }
 
-const HOME_COLUMNS = "id, title, author, genre, description, audio_url, cover_url, episodes, duration, plays, real_views, base_fake_views, status"
+const HOME_COLUMNS = "id, title, author, genre, description, cover_url, episodes, duration, plays, real_views, base_fake_views, status"
 
 export async function getHomeStories(): Promise<HomeStory[]> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -36,7 +35,6 @@ export async function getHomeStories(): Promise<HomeStory[]> {
     author: String(story.author || ""),
     genre: String(story.genre || ""),
     description: String(story.description || ""),
-    audio_url: String(story.audio_url || ""),
     cover_url: story.cover_url ? String(story.cover_url) : null,
     episodes: Number(story.episodes || 0),
     duration: formatClockDuration(String(story.duration || "")),

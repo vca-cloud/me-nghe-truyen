@@ -20,7 +20,7 @@ import { ImageWithFallback } from "@/components/image-with-fallback"
 import type { Metadata } from "next"
 import { totalViewsFor } from "@/lib/story-views"
 import { getTrackData, plainDescription, storyPath } from "@/lib/track-data"
-import { supabase } from "@/lib/supabase"
+import { supabase, toPublicEpisodes } from "@/lib/supabase"
 import { getSiteUrl } from "@/lib/site-url"
 
 type TrackParams = { params: Promise<{ slug?: string; id?: string }> }
@@ -156,11 +156,10 @@ export default async function TrackPage({ params }: TrackParams) {
               <TrackExperience
                 storyId={story.id}
                 title={story.title}
-                audioUrl={story.audio_url}
                 coverUrl={story.cover_url}
                 episodeCount={story.episodes || 1}
                 status={story.status}
-                episodes={episodes}
+                episodes={toPublicEpisodes(episodes)}
                 previousTrackId={previousTrackSlug}
                 nextTrackId={nextTrackSlug}
               />

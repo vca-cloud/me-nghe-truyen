@@ -4,12 +4,12 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { AudioPlayer, type AudioPlayerHandle } from "@/components/track/player"
 import { EpisodeList } from "@/components/track/episode-list"
 import { AffiliateModal } from "@/components/AffiliateModal"
-import type { Episode } from "@/lib/supabase"
+import { toast } from "sonner"
+import type { PublicEpisode as Episode } from "@/lib/supabase"
 
 interface TrackExperienceProps {
   storyId: number
   title: string
-  audioUrl: string | null
   coverUrl: string | null
   episodeCount: number
   status: string | null
@@ -21,7 +21,6 @@ interface TrackExperienceProps {
 export function TrackExperience({
   storyId,
   title,
-  audioUrl,
   coverUrl,
   episodeCount,
   status,
@@ -34,9 +33,9 @@ export function TrackExperience({
     story_id: 0,
     episode_number: 1,
     title: "Tập 1",
-    audio_url: audioUrl || "",
     duration: null,
-  }), [audioUrl])
+  }), [])
+  const [audioUrls, setAudioUrls] = useState<{ fallback: string | null; byId: Record<number, string> } | null>(null)
 
   const availableEpisodes = episodes.length > 0 ? episodes : [fallbackEpisode]
   const [selectedNumber, setSelectedNumber] = useState(availableEpisodes[0]?.episode_number || 1)
@@ -63,26 +62,30 @@ export function TrackExperience({
     setShowAffiliate(false)
   }
 
-  const handleUnlock = () => {
-    setIsUnlocked(true)
-    setShowAffiliate(false)
+  const fetchAudioUrls = async () => {
+    const response = await fetch(`/api/track-audio?storyId=${storyId}`, { cache: "no-store" })
+    if (!response.ok) throw new Error("locked")
+    const data = await response.json() as { fallbackAudioUrl: string | null; episodes: { id: number; audio_url: string }[] }
+    const urls = { fallback: data.fallbackAudioUrl, byId: Object.fromEntries(data.episodes.map((episode) => [episode.id, episode.audio_url])) }
+    setAudioUrls(urls)
+    return urls
+  }
 
+  const handleUnlock = async () => {
+    setShowAffiliate(false)
+    try {
+      if (!audioUrls) await fetchAudioUrls()
+    } catch {
+      toast.error("Chưa mở khóa được audio. Vui lòng bấm lại nút mở khóa.")
+      return
+    }
+    setIsUnlocked(true)
     if (pendingEpisode) {
       setSelectedNumber(pendingEpisode.episode_number)
       setPendingEpisode(null)
-
-      // Auto play sau khi chuyển episode
-      setTimeout(() => {
-        if (audioPlayerRef.current) {
-          audioPlayerRef.current.playAudio()
-        }
-      }, 100)
-    } else {
-      // Auto play episode hiện tại
-      if (audioPlayerRef.current) {
-        audioPlayerRef.current.playAudio()
-      }
     }
+    // Chờ player nhận link mới rồi mới phát.
+    setTimeout(() => { void audioPlayerRef.current?.playAudio() }, 120)
   }
 
   const handleModalClose = () => {
@@ -117,7 +120,7 @@ export function TrackExperience({
         title={title}
         storyId={storyId}
         episodeId={selectedEpisode.id || null}
-        audioUrl={selectedEpisode.audio_url}
+        audioUrl={(selectedEpisode.id ? audioUrls?.byId[selectedEpisode.id] : audioUrls?.fallback) || ""}
         coverUrl={coverUrl}
         episodeTitle={`Tập ${selectedEpisode.episode_number}: ${selectedEpisode.title}`}
         previousTrackId={selectedIndex === 0 ? previousTrackId : undefined}
@@ -136,7 +139,7 @@ export function TrackExperience({
         storyId={storyId}
         isOpen={showAffiliate}
         onClose={handleModalClose}
-        onUnlock={handleUnlock}
+        onUnlock={() => void handleUnlock()}
       />
     </>
   )
