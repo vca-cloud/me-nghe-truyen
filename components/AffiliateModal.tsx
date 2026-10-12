@@ -115,13 +115,14 @@ export function AffiliateModal({ isOpen, onClose, onUnlock, storyId, storyTitle,
           </div>
         </div>
 
-        <div className="px-6 pb-6 pt-5 text-center">
+        <div className="px-5 pb-6 pt-5 text-center sm:px-6">
           {error ? <p className="text-muted-foreground">{error}</p> : (
             <>
               <h2 id="affiliate-title" className="text-2xl font-bold text-foreground [text-wrap:balance]">Nghe miễn phí, chỉ cần 1 chạm</h2>
-              {/* Màn hẹp: căn giữa, cân dòng (justify trên điện thoại giãn khoảng trắng, nhất là Safari iOS). sm+: 2 dòng cân bằng rồi căn đều. */}
-              <p className="mt-2 text-center text-[15px] leading-6 text-muted-foreground [text-wrap:balance] sm:text-justify sm:[text-align-last:justify]">
-                <BrandName /> duy trì nhờ <span className="whitespace-nowrap">link Shopee</span>. Bạn chỉ cần bấm mở link, <strong className="whitespace-nowrap font-bold text-[#EE4D2D]">không cần mua gì</strong>, rồi quay lại là nghe ngay.
+              {/* Luôn đúng 2 dòng, căn giữa; cỡ chữ co theo bề ngang để không dòng nào xuống hàng. */}
+              <p className="mt-2 text-center text-[clamp(11px,3.7vw,15px)] leading-6 text-muted-foreground">
+                <span className="block whitespace-nowrap"><BrandName /> duy trì nhờ link Shopee.</span>
+                <span className="block whitespace-nowrap">Chỉ cần bấm mở link, <strong className="font-bold text-[#EE4D2D]">không cần mua gì</strong>.</span>
               </p>
               <ul className="mx-auto mt-4 w-fit space-y-1.5 text-left text-[15px] text-foreground">
                 <li><span className="mr-2 font-bold text-[#EE4D2D]">✓</span>Miễn phí toàn bộ truyện</li>
