@@ -69,7 +69,7 @@ app/
 ├── admin/{login,analytics,audio,affiliate,users,staffs,categories,settings}/
 └── api/
     ├── home-stories/                # Danh sách truyện cho trang chủ (không có audio_url)
-    ├── track-audio/                 # Link audio của truyện: preview=1 hoặc cookie mở khóa
+    ├── track-audio/                 # Link audio của truyện, chỉ khi có cookie mở khóa mnt_unlock
     ├── increment-views/             # +1 real_views qua RPC record_story_listen
     ├── affiliate-events/            # Ghi lượt hiển thị popup (impression)
     ├── affiliate-links/{active,preview}/, affiliate-links/[id]/click/  # click: đếm + ghi event + set cookie mở khóa
@@ -139,18 +139,18 @@ Biểu đồ admin: không dùng hai trục Y, tắt animation (`isAnimationActi
 Luồng nghe (`components/track/track-experience.tsx` + `player.tsx` + `AffiliateModal.tsx`):
 
 1. HTML/RSC không chứa link audio: page truyền `toPublicEpisodes(episodes)`.
-2. Bấm Phát lần đầu → lấy link qua `GET /api/track-audio?storyId=&preview=1` → **nghe thử 60 giây không thông báo** (không hiện đếm ngược hay chữ "nghe thử"). Player đếm thời gian nghe thật (bỏ qua tua, chia tốc độ phát); đủ 60s thì dừng, gửi GA `preview_end`, mở popup.
-3. Popup không có nút đóng/"Để sau". Sau khi hết nghe thử, mọi click trên trang mở lại popup (cố ý, để tối đa lượt bấm). Chọn tập khác trong lúc còn nghe thử thì được.
-4. Bấm "NGHE NGAY – MIỄN PHÍ" → mở Shopee tab mới, `POST /api/affiliate-links/[id]/click` (body `storyId`: đếm click, ghi `affiliate_events`, set cookie ký `mnt_unlock` 6 giờ cho truyện) + `/api/increment-views` → nghe tiếp đúng chỗ dừng.
-5. **Không ghi nhớ** mở khóa/nghe thử giữa các lần vào trang (cố ý). Cookie `mnt_unlock` chỉ để `/api/track-audio` (không có `preview=1`) trả link.
+2. **Không có nghe thử** (đã thử nghe thử 60s ngày 06–12/10: 0 lượt popup, 0 click → bỏ theo yêu cầu chủ dự án 2026-10-12). Bấm Phát, chọn tập, hoặc bất kỳ click nào trên trang khi chưa mở khóa → popup hiện ngay, chưa có link audio.
+3. Popup không có nút đóng/"Để sau".
+4. Bấm "NGHE NGAY – MIỄN PHÍ" → mở Shopee tab mới, `POST /api/affiliate-links/[id]/click` (body `storyId`: đếm click, ghi `affiliate_events`, set cookie ký `mnt_unlock` 6 giờ cho truyện) + `/api/increment-views` → `TrackExperience` gọi `GET /api/track-audio?storyId=` (403 nếu thiếu cookie) lấy link rồi phát.
+5. **Không ghi nhớ** mở khóa giữa các lần vào trang (cố ý, để tối đa lượt bấm).
 
 Popup: tên truyện + tập, tiêu đề "Nghe miễn phí, chỉ cần 1 chạm", `<BrandName />`, "không cần mua gì" tô `#EE4D2D`, đoạn mô tả căn đều (điện thoại: dòng cuối căn trái; `sm+`: 2 dòng cân bằng + `text-align-last: justify`), 3 dòng ✓, sản phẩm thu nhỏ "Gợi ý hôm nay" (lấy `title` của link affiliate). Dùng `bg-background`/`text-foreground`/`text-muted-foreground`.
 
-Chống tải (mức 1): link không có trong HTML, player chặn chuột phải/nhấn giữ, `controlsList=nodownload`. Giới hạn: vì có nghe thử, ai mở DevTools vẫn thấy link `r2.dev` cố định; anon key vẫn đọc được `episodes.audio_url` qua Supabase REST. Chặn triệt để cần "mức 2" (bucket private + URL ký có hạn, cần R2 Access Key) — chưa làm.
+Chống tải (mức 1): link không có trong HTML, player chặn chuột phải/nhấn giữ, `controlsList=nodownload`. Giới hạn: sau khi mở khóa, ai mở DevTools vẫn thấy link `r2.dev` cố định (dùng lại được); anon key vẫn đọc được `episodes.audio_url` qua Supabase REST. Chặn triệt để cần "mức 2" (bucket private + URL ký có hạn, cần R2 Access Key) — chưa làm.
 
 `AudioPlayer`: `<audio>` thật, tua ±10s, tốc độ 0.75x–2x, hẹn giờ tắt (15/30/60 phút hoặc hết tập), Media Session (màn hình khóa/tai nghe). **Không tự chuyển tập/truyện** khi hết tập (TrackExperience truyền `onEnded`). Tiến độ: user đăng nhập đọc/ghi `/api/listening-history` (ghi khi bắt đầu, thưa khi nghe, flush khi pause, completed khi hết); mọi lần lưu cũng ghi `localStorage` `mnt-progress:<storyId>:<episodeId|0>` và guest khôi phục từ đó. Không gọi API ở mọi `timeupdate`. Trang chủ có **Nghe tiếp** (`continue-listening.tsx`) cho user đăng nhập.
 
-GA events: `audio_play` (có cờ `preview`), `audio_complete`, `preview_end`, `sleep_timer_set`, `affiliate_impression`, `affiliate_click`. GA đếm lượt truy cập web; dashboard admin đếm lượt nghe/popup — hai nơi luôn khác nhau.
+GA events: `audio_play`, `audio_complete`, `sleep_timer_set`, `affiliate_impression`, `affiliate_click`. GA đếm lượt truy cập web; dashboard admin đếm lượt nghe/popup — hai nơi luôn khác nhau.
 
 ## Account member
 
@@ -216,6 +216,6 @@ RLS production: `admin_users` chỉ service_role; `staffs` API disabled; `favori
 
 - Audio/cover dán URL công khai `r2.dev` (giới hạn tốc độ, không dành cho production); chưa upload thẳng lên R2 từ form; 15 truyện chưa có ảnh bìa. Audio MP3 ~125 kbps — nén 64 kbps mono sẽ giảm ~50% dung lượng (đề xuất, chưa làm).
 - Chưa có playlist, shuffle, tự chuyển tập, merge tiến độ guest lên server sau login.
-- Cần kiểm thử thủ công trên điện thoại: màn hình khóa, hẹn giờ tắt, nghe thử 60s → popup → nghe tiếp.
+- Cần kiểm thử thủ công trên điện thoại: màn hình khóa, hẹn giờ tắt, bấm Phát → popup → Shopee → nghe.
 - Trước khi hoàn tất: `npm run build`, `npm run lint` (0 error; còn ~27 warning cũ), `git diff --check`. Với react-hooks `set-state-in-effect`: tải dữ liệu lúc mount bằng hàm fetch thuần + `.then(setState)`, reset state theo prop bằng điều chỉnh trong render.
 - Kiểm thử UI bằng `puppeteer-core` + Chrome cài sẵn (cài vào scratchpad, không thêm vào `package.json`); chặn `/api/increment-views`, `/api/affiliate-events`, đổi click sang link id không tồn tại (`999999`) để không làm bẩn số liệu thật. Ký cookie admin thử bằng `createAdminSession(email staff thật)` qua `npx tsx`.
