@@ -144,7 +144,7 @@ Luồng nghe (`components/track/track-experience.tsx` + `player.tsx` + `Affiliat
 4. Bấm "NGHE NGAY – MIỄN PHÍ" → mở Shopee tab mới, `POST /api/affiliate-links/[id]/click` (body `storyId`: đếm click, ghi `affiliate_events`, set cookie ký `mnt_unlock` 6 giờ cho truyện) + `/api/increment-views` → `TrackExperience` gọi `GET /api/track-audio?storyId=` (403 nếu thiếu cookie) lấy link rồi phát.
 5. **Không ghi nhớ** mở khóa giữa các lần vào trang (cố ý, để tối đa lượt bấm).
 
-Popup: tên truyện + tập, tiêu đề "Nghe miễn phí, chỉ cần 1 chạm", `<BrandName />`, "không cần mua gì" tô `#EE4D2D`, đoạn mô tả căn đều (điện thoại: dòng cuối căn trái; `sm+`: 2 dòng cân bằng + `text-align-last: justify`), 3 dòng ✓, sản phẩm thu nhỏ "Gợi ý hôm nay" (lấy `title` của link affiliate). Dùng `bg-background`/`text-foreground`/`text-muted-foreground`.
+Popup: tên truyện + tập, tiêu đề "Nghe miễn phí, chỉ cần 1 chạm", `<BrandName />`, "không cần mua gì" tô `#EE4D2D`, đoạn mô tả: điện thoại căn giữa + `text-wrap: balance` (justify trên màn hẹp, nhất là Safari iOS, giãn khoảng trắng lớn — đã thử, không dùng), `sm+` căn đều 2 dòng (`text-align-last: justify`); "link Shopee" và "không cần mua gì" không xuống dòng giữa cụm, 3 dòng ✓, sản phẩm thu nhỏ "Gợi ý hôm nay" (lấy `title` của link affiliate). Dùng `bg-background`/`text-foreground`/`text-muted-foreground`.
 
 Chống tải (mức 1): link không có trong HTML, player chặn chuột phải/nhấn giữ, `controlsList=nodownload`. Giới hạn: sau khi mở khóa, ai mở DevTools vẫn thấy link `r2.dev` cố định (dùng lại được); anon key vẫn đọc được `episodes.audio_url` qua Supabase REST. Chặn triệt để cần "mức 2" (bucket private + URL ký có hạn, cần R2 Access Key) — chưa làm.
 
