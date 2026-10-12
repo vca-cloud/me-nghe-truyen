@@ -108,7 +108,7 @@ export default async function TrackPage({ params }: TrackParams) {
         </Breadcrumb>
 
         <div className="grid w-full grid-cols-1 gap-8 lg:grid-cols-[minmax(280px,360px)_minmax(0,1fr)] lg:gap-10">
-          <aside className="flex min-h-0 flex-col gap-8">
+          <aside className="order-2 flex min-h-0 flex-col gap-8 lg:order-1">
             <section className="flex flex-col gap-4">
               <Badge className="w-fit">{totalViewsFor(story).toLocaleString()} lượt nghe</Badge>
               <div className="aspect-square w-full overflow-hidden rounded-xl border">
@@ -151,8 +151,9 @@ export default async function TrackPage({ params }: TrackParams) {
             </div>
           </aside>
 
-          <section className="flex flex-col gap-12">
-            <Card id="audio-player" className="w-full"><CardContent className="p-4 sm:p-6 md:p-10">
+          {/* Điện thoại: section "contents" để player lên đầu (order-1), thông tin truyện (order-2), truyện liên quan (order-3). */}
+          <section className="contents lg:order-2 lg:flex lg:flex-col lg:gap-12">
+            <Card id="audio-player" className="order-1 w-full"><CardContent className="p-4 sm:p-6 md:p-10">
               <TrackExperience
                 storyId={story.id}
                 title={story.title}
@@ -165,7 +166,7 @@ export default async function TrackPage({ params }: TrackParams) {
               />
             </CardContent></Card>
 
-            {relatedStories.length > 0 && <section className="flex flex-col gap-5">
+            {relatedStories.length > 0 && <section className="order-3 flex flex-col gap-5">
               <h2 className="text-2xl font-bold">Truyện liên quan</h2>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
                 {relatedStories.map((related) => (

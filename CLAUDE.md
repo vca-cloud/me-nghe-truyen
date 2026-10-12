@@ -134,7 +134,7 @@ Biểu đồ admin: không dùng hai trục Y, tắt animation (`isAnimationActi
 
 ## Track, affiliate và player
 
-`app/track/[slug]/page.tsx`: thông tin truyện, total views, thể loại, link **Đọc truyện chữ** (`text_url`, trống thì về track hiện tại), player, danh sách tập. URL từ `slugify(title)` hoặc ID (production có thể không có cột `stories.slug`). ISR 60s; `generateStaticParams` build sẵn 12 truyện nhiều view nhất. `lib/track-data.ts` (`getTrackData`, React `cache`) dùng chung cho page, `generateMetadata`, `opengraph-image`. Không `select("*")` toàn bảng, không đọc cookies trong page (phá ISR). Ảnh bìa qua `ImageWithFallback` (host R2 → `next/image`, host khác → `<img loading="lazy">`).
+`app/track/[slug]/page.tsx`: thông tin truyện, total views, thể loại, link **Đọc truyện chữ** (`text_url`, trống thì về track hiện tại), player, danh sách tập. URL từ `slugify(title)` hoặc ID (production có thể không có cột `stories.slug`). ISR 60s; `generateStaticParams` build sẵn 12 truyện nhiều view nhất. Bố cục: điện thoại xếp player + danh sách tập lên đầu, rồi thông tin truyện, rồi truyện liên quan (section phải dùng `contents` + `order-*`); `lg+` 2 cột (thông tin trái, player phải). `lib/track-data.ts` (`getTrackData`, React `cache`) dùng chung cho page, `generateMetadata`, `opengraph-image`. Không `select("*")` toàn bảng, không đọc cookies trong page (phá ISR). Ảnh bìa qua `ImageWithFallback` (host R2 → `next/image`, host khác → `<img loading="lazy">`).
 
 Luồng nghe (`components/track/track-experience.tsx` + `player.tsx` + `AffiliateModal.tsx`):
 
