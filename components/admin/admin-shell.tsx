@@ -1,10 +1,12 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import NextLink from "next/link"
 import {
   BookOpen,
   ChevronDown,
   FileAudio,
+  Flag,
   LayoutDashboard,
   Link2,
   LogOut,
@@ -21,6 +23,7 @@ import { Input } from "@/components/ui/input"
 
 const navigation = [
   { href: "/admin/audio", label: "Quản lý Audio", icon: FileAudio },
+  { href: "/admin/reports", label: "Báo lỗi", icon: Flag },
   { href: "/admin/affiliate", label: "Affiliate Shopee", icon: Link2 },
   { href: "/admin/users", label: "Thành viên", icon: Users },
   { href: "/admin/staffs", label: "Quản trị viên", icon: ShieldCheck },
@@ -28,7 +31,20 @@ const navigation = [
   { href: "/admin/settings", label: "Cài đặt", icon: Settings },
 ]
 
+// Số báo lỗi chưa xử lý hiện cạnh menu "Báo lỗi" (bảng chưa tạo hoặc lỗi thì không hiện).
+function fetchOpenReports() {
+  return fetch("/api/admin/reports?count=1", { cache: "no-store" })
+    .then((response) => (response.ok ? response.json() : { open: 0 }))
+    .then((data: { open?: number }) => data.open ?? 0)
+    .catch(() => 0)
+}
+
 export function AdminShell({ children }: { children: React.ReactNode }) {
+  const [openReports, setOpenReports] = useState(0)
+  useEffect(() => {
+    fetchOpenReports().then(setOpenReports)
+  }, [])
+
   return (
     <div className="min-h-screen bg-muted/30 text-foreground">
       <aside className="fixed inset-y-0 left-0 hidden w-64 flex-col border-r bg-background lg:flex">
@@ -50,6 +66,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
           {navigation.map(({ href, label, icon: Icon }) => (
             <NextLink key={href} href={href} className="flex items-center gap-3 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground">
               <Icon className="h-4 w-4" /> {label}
+              {href === "/admin/reports" && openReports > 0 && <Badge className="ml-auto bg-[#EE4D2D] text-white">{openReports}</Badge>}
             </NextLink>
           ))}
         </nav>

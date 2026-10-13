@@ -4,8 +4,9 @@ import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "re
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Slider } from "@/components/ui/slider"
-import { Headphones, Moon, Pause, Play, RotateCcw, RotateCw, SkipBack, SkipForward } from "lucide-react"
+import { Headphones, Moon, Pause, Play, RefreshCw, RotateCcw, RotateCw, SkipBack, SkipForward } from "lucide-react"
 import { ImageWithFallback } from "@/components/image-with-fallback"
+import { ReportIssueButton, reportAudioError } from "@/components/track/report-issue"
 import { trackEvent } from "@/lib/analytics"
 import { readLocalProgress, writeLocalProgress } from "@/lib/local-progress"
 
@@ -103,9 +104,12 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(funct
         audio.currentTime = 0
         startedRef.current = false
       }
+      setError(null)
       await audio.play()
-    } catch {
-      setError("Không thể phát file audio. Hãy kiểm tra URL R2 công khai.")
+    } catch (err) {
+      // NotAllowedError/AbortError: trình duyệt chặn tự phát hoặc người nghe đổi tập — không phải lỗi file.
+      if (err instanceof DOMException && (err.name === "NotAllowedError" || err.name === "AbortError")) return
+      setError("Chưa phát được tập này. Bấm Thử lại, nếu vẫn lỗi hãy báo cho chúng mình.")
     }
   }
 
@@ -141,6 +145,18 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(funct
     }
     void loadProgress()
   }, [audioUrl, episodeId, storyId])
+
+  const retry = () => {
+    const audio = audioRef.current
+    if (!audio) return
+    const resumeAt = audio.currentTime || currentTime
+    setError(null)
+    audio.load()
+    if (resumeAt > 0) audio.currentTime = resumeAt
+    void playAudio()
+  }
+
+  const reportContext = { storyId, episodeId, episodeTitle: `${title} – ${episodeTitle}` }
 
   const togglePlay = () => {
     if (!isUnlocked) {
@@ -265,7 +281,13 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(funct
           onEnded?.()
           if (!onEnded) navigate(nextTrackId)
         }}
-        onError={() => { if (audioUrl) setError("Không tải được file audio, vui lòng thử lại.") }}
+        onError={(e) => {
+          // Mã 1 (ABORTED) xảy ra khi người nghe đổi tập/rời trang — không phải lỗi.
+          if (!audioUrl || e.currentTarget.error?.code === 1) return
+          setIsPlaying(false)
+          setError("Không tải được audio tập này. Kiểm tra mạng rồi bấm Thử lại, hoặc báo lỗi để chúng mình sửa.")
+          reportAudioError(reportContext, e.currentTarget.error?.code, audioUrl)
+        }}
       />
 
       <div className="flex w-full flex-col items-center gap-8">
@@ -280,8 +302,8 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(funct
         </div>
 
         <div className="text-center">
-          <div className="text-base text-muted-foreground">{episodeTitle}</div>
-          <div className="mt-1 text-3xl font-bold text-foreground">{title}</div>
+          <div className="text-base text-[#2D74A8]">{episodeTitle}</div>
+          <div className="mt-1 text-3xl font-bold text-[#154B95]">{title}</div>
         </div>
 
         <div className="w-full">
@@ -299,7 +321,15 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(funct
           </div>
         </div>
 
-        {error && <p className="text-center text-sm text-destructive">{error}</p>}
+        {error && (
+          <div role="alert" className="flex w-full flex-col items-center gap-3 rounded-xl border border-[#EE4D2D]/40 bg-[#EE4D2D]/10 p-4 text-center">
+            <p className="text-sm font-medium text-[#EE4D2D]">{error}</p>
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <Button type="button" size="sm" onClick={retry}><RefreshCw className="mr-1.5 h-4 w-4" />Thử lại</Button>
+              <ReportIssueButton context={reportContext} variant="outline" />
+            </div>
+          </div>
+        )}
 
         <div className="flex w-full items-center justify-center gap-3 sm:gap-5 md:gap-6">
           <Button variant="ghost" size="icon" aria-label="Bài trước" disabled={!previousTrackId && currentTime <= 3} onClick={handlePrevious} className="h-12 w-12 shrink-0">
@@ -336,7 +366,7 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(funct
         </div>
 
         <div className="flex w-full flex-col items-center gap-2">
-          <div className="flex items-center gap-2 text-sm font-medium text-[#154B95] dark:text-[#9ECDDD]">
+          <div className="flex items-center gap-2 text-sm font-medium text-[#154B95]">
             <Moon className="h-4 w-4" />
             {sleepMode === "episode"
               ? "Sẽ dừng khi hết tập này"
@@ -358,6 +388,8 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(funct
             {sleepMode && <Button variant="ghost" size="sm" onClick={() => chooseSleep(null)}>Hủy</Button>}
           </div>
         </div>
+
+        {!error && <ReportIssueButton context={reportContext} />}
       </div>
     </div>
   )

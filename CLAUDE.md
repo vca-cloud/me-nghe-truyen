@@ -68,15 +68,17 @@ app/
 ├── sitemap.ts, robots.ts            # /sitemap.xml (trang tĩnh + mọi track), /robots.txt (chặn /admin, /api/, /account, /auth/)
 ├── favicon.ico, icon.svg, apple-icon.tsx  # Icon tai nghe (nền #154B95, quai trắng, tai #EE4D2D)
 ├── opengraph-image.tsx              # Ảnh chia sẻ mặc định (lib/og-card.tsx, font assets/fonts/BeVietnamPro-Bold.ttf, OFL)
-├── admin/{login,analytics,audio,affiliate,users,staffs,categories,settings}/
+├── admin/{login,analytics,audio,reports,affiliate,users,staffs,categories,settings}/
 └── api/
     ├── home-stories/                # Danh sách truyện cho trang chủ (không có audio_url)
     ├── track-audio/                 # Link audio của truyện, chỉ khi có cookie mở khóa mnt_unlock
     ├── increment-views/             # +1 real_views qua RPC record_story_listen
     ├── affiliate-events/            # Ghi lượt hiển thị popup (impression)
+    ├── report-issue/                # Người nghe báo lỗi + player tự ghi lỗi audio → bảng issue_reports
     ├── affiliate-links/{active,preview}/, affiliate-links/[id]/click/  # click: đếm + ghi event + set cookie mở khóa
     ├── account/profile/, favorites/, listening-history/, sync-user/
     ├── admin/{login,logout,db,analytics,usage,stories,staffs,users}/, admin/users/sync/
+    ├── admin/reports/               # GET danh sách/?count=1, PATCH đã xử lý/mở lại, DELETE
     ├── admin/r2/list/               # Duyệt bucket R2 (thư mục + file audio) cho admin
     ├── admin/r2/upload/             # Trả presigned PUT (10 phút) cho ảnh bìa covers/*.webp
     └── backup/
@@ -85,7 +87,7 @@ components/
 ├── header.tsx, footer.tsx, audio-card.tsx, info-page.tsx (InfoPage, BrandName, ContactLink, CONTACT_EMAIL)
 ├── home-page.tsx, continue-listening.tsx, login-form.tsx, signup-form.tsx, theme-toggle.tsx
 ├── AffiliateModal.tsx, image-with-fallback.tsx, account/account-page.tsx
-├── track/{player,episode-list,track-actions,track-experience}.tsx
+├── track/{player,episode-list,track-actions,track-experience,report-issue}.tsx
 ├── admin/                           # admin-shell, action-buttons, audio-form-dialog, affiliate-manager,
 │                                    # category-manager, import-stories-dialog, affiliate-funnel,
 │                                    # detailed-report, system-usage, cover-uploader, r2-audio-picker
@@ -97,7 +99,7 @@ lib/
 ├── password.ts (scrypt), request-ip.ts, visitor.ts (visitor_hash), audio-unlock.ts (cookie mnt_unlock)
 ├── home-stories.ts, track-data.ts, story-views.ts, duration.ts, import-stories.ts, slug.ts, utils.ts (formatDateVN)
 ├── analytics.ts (trackEvent → gtag), local-progress.ts, og-card.tsx, site-url.ts, signup-validation.ts, sync-admin-user.ts
-├── affiliate-api.ts, category-data.ts, category-options.ts, categories.ts
+├── issue-reports.ts (ISSUE_KINDS, describeMediaError), affiliate-api.ts, category-data.ts, category-options.ts, categories.ts
 ├── r2.ts (aws4fetch: listR2, presignPut, publicUrlFor), image-to-webp.ts (cắt 4:5 → WebP), episode-order.ts
 └── social-proof.ts                  # không được import ở đâu
 
@@ -155,6 +157,8 @@ Chống tải (mức 1): link không có trong HTML, player chặn chuột phả
 
 `AudioPlayer`: `<audio>` thật, tua ±10s, tốc độ 0.75x–2x, hẹn giờ tắt (15/30/60 phút hoặc hết tập), Media Session (màn hình khóa/tai nghe). **Không tự chuyển tập/truyện** khi hết tập (TrackExperience truyền `onEnded`). Tiến độ: user đăng nhập đọc/ghi `/api/listening-history` (ghi khi bắt đầu, thưa khi nghe, flush khi pause, completed khi hết); mọi lần lưu cũng ghi `localStorage` `mnt-progress:<storyId>:<episodeId|0>` và guest khôi phục từ đó. Không gọi API ở mọi `timeupdate`. Trang chủ có **Nghe tiếp** (`continue-listening.tsx`) cho user đăng nhập.
 
+Báo lỗi (`components/track/report-issue.tsx`): link "Gặp sự cố? Báo lỗi" dưới player mở hộp chọn loại lỗi (không phát được, rè/mất tiếng, sai tập, tải chậm, lỗi mở khóa/Shopee, khác — "khác" bắt buộc mô tả) + mô tả + liên hệ tùy chọn, honeypot `website`. Lỗi `<audio>` (trừ mã 1 ABORTED) hiện khung cam "Thử lại" + "Báo lỗi" và **tự gửi** `audio_error` kèm mã MediaError + host. Lớp chặn click khi chưa mở khóa bỏ qua `[data-report-issue]` (và khi hộp báo lỗi đang mở) để báo lỗi không bật popup. `/api/report-issue` chống spam theo instance: 5 báo tay/10 phút/visitor, lỗi tự động 1 lần/30 phút/visitor+tập; lấy email user đăng nhập làm liên hệ nếu trống. Khung player luôn nền mint ở cả hai theme → chữ trong player dùng `#154B95`/`#2D74A8` cố định.
+
 GA events: `audio_play`, `audio_complete`, `sleep_timer_set`, `affiliate_impression`, `affiliate_click`. GA đếm lượt truy cập web; dashboard admin đếm lượt nghe/popup — hai nơi luôn khác nhau.
 
 ## Account member
@@ -171,6 +175,7 @@ Signup (`components/signup-form.tsx`, `lib/signup-validation.ts`): tiếng Việ
 | --- | --- |
 | `/admin/audio` | CRUD truyện/tập, import CSV/JSON |
 | `/admin/analytics` | Dashboard (mô tả dưới) |
+| `/admin/reports` | Báo lỗi: lọc chưa xử lý/đã xử lý, nhóm "chỗ bị báo lỗi nhiều nhất" theo truyện+tập, mở file audio, đánh dấu đã xử lý (từng cái/cả nhóm), xóa rác; menu có badge số chưa xử lý |
 | `/admin/affiliate` | Link affiliate (`title` hiện ở "Gợi ý hôm nay" trong popup — nên đặt tên sản phẩm) |
 | `/admin/categories` | Thể loại |
 | `/admin/users` | Directory `admin_users`, sync user Auth |
@@ -207,12 +212,13 @@ title,author,genre,description,cover_url,text_url,status,episode_number,episode_
 
 ## Supabase schema và migration
 
-Thứ tự trong `supabase/migrations/` (tất cả đã chạy trên production; riêng `20250910` chưa từng chạy và được `20250915` bù):
+Thứ tự trong `supabase/migrations/` (đã chạy trên production trừ khi ghi chú; riêng `20250910` chưa từng chạy và được `20250915` bù):
 
 - `20250906_create_stories_table.sql` … `20250913_create_member_account_tables.sql` (stories, slug, view counts, episodes, admin tables, affiliate_links, listener_logs, staff password/RLS, text_url, favorites/listening_history)
 - `20250914_lock_public_writes.sql` — anon/authenticated chỉ SELECT trên stories/episodes/categories/affiliate_links
 - `20250915_record_story_listen.sql` — tạo `listener_logs` nếu thiếu + hàm `record_story_listen` (service_role)
 - `20250916_affiliate_events_and_usage.sql` — bảng `affiliate_events` (impression/click, `visitor_hash` = SHA-256 IP+secret) + hàm `admin_system_usage()` (service_role)
+- `20250917_issue_reports.sql` — bảng `issue_reports` (chỉ service_role). **Chưa chạy trên production tính đến 2026-10-14** — chạy xong thì sửa dòng này
 
 RLS production: `admin_users` chỉ service_role; `staffs` API disabled; `favorites`/`listening_history` theo user; nội dung công khai chỉ SELECT. Khi sửa unique/upsert cho row có `episode_id NULL`, lưu ý unique index cho phép nhiều NULL.
 

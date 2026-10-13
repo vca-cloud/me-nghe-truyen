@@ -98,7 +98,9 @@ export function TrackExperience({
 
     const openAffiliateForInteraction = (event: Event) => {
       const target = event.target
-      if (target instanceof Element && target.closest("[data-affiliate-modal]")) return
+      if (target instanceof Element && target.closest("[data-affiliate-modal], [data-report-issue]")) return
+      // Hộp thoại báo lỗi đang mở (kể cả bấm ra nền mờ để đóng) thì không mở popup.
+      if (document.querySelector('[data-slot="dialog-content"][data-report-issue]')) return
       event.preventDefault()
       event.stopPropagation()
       setPendingEpisode(selectedEpisode)
