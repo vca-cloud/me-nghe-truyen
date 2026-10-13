@@ -1,6 +1,9 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
+import { CoverUploader } from "@/components/admin/cover-uploader"
+import { R2AudioPicker, type R2Pick } from "@/components/admin/r2-audio-picker"
+import { orderEpisodes } from "@/lib/episode-order"
 import { adminWrite } from "@/lib/admin-db"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
@@ -131,6 +134,15 @@ export function AudioFormDialog({ story = null, open: controlledOpen, onOpenChan
     }
   }
 
+  const applyR2Pick = async (pick: R2Pick) => {
+    const episodes = pick.kind === "folder" ? orderEpisodes(pick.files) : [{ episode_number: 1, title: "Tập 1", audio_url: pick.file.url }]
+    setEpisodeForms(episodes.map((episode) => ({ ...episode, duration: "" })))
+    if (pick.kind === "folder" && pick.folderName) setFormData((prev) => (prev.title.trim() ? prev : { ...prev, title: pick.folderName }))
+    toast.success(pick.kind === "folder" ? `Đã nạp ${episodes.length} tập từ thư mục "${pick.folderName}". Đang đo thời lượng…` : "Đã chọn 1 file audio. Đang đo thời lượng…")
+    // Đo lần lượt để không mở quá nhiều luồng tải metadata cùng lúc.
+    for (let index = 0; index < episodes.length; index++) await detectDuration(index, episodes[index].audio_url, { silent: true })
+  }
+
   const scheduleDurationDetect = (index: number, url: string) => {
     window.clearTimeout(detectTimers.current[index])
     detectTimers.current[index] = window.setTimeout(() => {
@@ -232,7 +244,7 @@ export function AudioFormDialog({ story = null, open: controlledOpen, onOpenChan
           <div className="space-y-2"><Label htmlFor="status">Trạng thái</Label><Select value={formData.status} onValueChange={(value) => setFormData((prev) => ({ ...prev, status: value || statuses[0] }))}><SelectTrigger id="status"><SelectValue placeholder="Chọn trạng thái" /></SelectTrigger><SelectContent>{statuses.map((status) => <SelectItem key={status} value={status}>{status}</SelectItem>)}</SelectContent></Select></div>
           <div className="space-y-2"><Label htmlFor="description">Mô tả ngắn</Label><Textarea id="description" value={formData.description} onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))} rows={3} required /></div>
           <div className="space-y-2">
-            <div className="flex items-center justify-between"><Label>Danh sách tập</Label><Button type="button" variant="outline" size="sm" onClick={() => setEpisodeForms((items) => [...items, { ...emptyEpisode, episode_number: items.length + 1 }])}>+ Thêm tập mới</Button></div>
+            <div className="flex flex-wrap items-center justify-between gap-2"><Label>Danh sách tập</Label><div className="flex flex-wrap gap-2"><R2AudioPicker onPick={(pick) => void applyR2Pick(pick)} /><Button type="button" variant="outline" size="sm" onClick={() => setEpisodeForms((items) => [...items, { ...emptyEpisode, episode_number: items.length + 1 }])}>+ Thêm tập mới</Button></div></div>
             <div className="space-y-2 rounded-md border p-2">
               {episodeForms.map((episode, index) => (
                 <div key={index} className="grid grid-cols-[50px_1fr_auto] gap-2">
@@ -275,7 +287,7 @@ export function AudioFormDialog({ story = null, open: controlledOpen, onOpenChan
               ))}
             </div>
           </div>
-          <div className="space-y-2"><Label htmlFor="cover_url">Link Cover (tùy chọn)</Label><Input id="cover_url" value={formData.cover_url} onChange={(e) => setFormData((prev) => ({ ...prev, cover_url: e.target.value }))} placeholder="https://pub-xxx.r2.dev/cover.jpg" /></div>
+          <div className="space-y-2"><Label>Ảnh bìa 4:5 (tùy chọn)</Label><CoverUploader value={formData.cover_url} storyTitle={formData.title} onChange={(url) => setFormData((prev) => ({ ...prev, cover_url: url }))} /></div>
           <div className="space-y-2">
             <Label htmlFor="text_url">Link truyện chữ (tùy chọn)</Label>
             <Input

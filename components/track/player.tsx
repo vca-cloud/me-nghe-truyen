@@ -269,7 +269,7 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(funct
       />
 
       <div className="flex w-full flex-col items-center gap-8">
-        <div className="h-56 w-56 overflow-hidden rounded-xl border shadow-xl">
+        <div className="aspect-[4/5] w-48 overflow-hidden rounded-xl border shadow-xl sm:w-56">
           {coverUrl ? (
             <ImageWithFallback src={coverUrl} alt={title} className="h-full w-full object-cover" />
           ) : (

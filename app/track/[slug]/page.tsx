@@ -111,7 +111,7 @@ export default async function TrackPage({ params }: TrackParams) {
           <aside className="order-2 flex min-h-0 flex-col gap-8 lg:order-1">
             <section className="flex flex-col gap-4">
               <Badge className="w-fit">{totalViewsFor(story).toLocaleString()} lượt nghe</Badge>
-              <div className="aspect-square w-full overflow-hidden rounded-xl border">
+              <div className="aspect-[4/5] w-full overflow-hidden rounded-xl border">
                 {story.cover_url ? (
                   <ImageWithFallback src={story.cover_url} alt={story.title} priority className="h-full w-full object-cover" />
                 ) : (
@@ -171,17 +171,17 @@ export default async function TrackPage({ params }: TrackParams) {
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
                 {relatedStories.map((related) => (
                   <Link key={related.id} href={`/track/${storyPath(related)}`}>
-                    <Card className="h-full overflow-hidden transition-colors hover:bg-accent">
-                      <div className="aspect-video border-b">
+                    <Card className="flex h-full flex-row gap-0 overflow-hidden py-0 transition-colors hover:bg-accent">
+                      <div className="aspect-[4/5] w-24 shrink-0 self-start overflow-hidden border-r sm:w-28">
                         {related.cover_url ? (
-                          <ImageWithFallback src={related.cover_url} alt={related.title} sizes="(max-width: 640px) 100vw, 33vw" className="h-full w-full object-cover" />
+                          <ImageWithFallback src={related.cover_url} alt={related.title} sizes="112px" className="h-full w-full object-cover" />
                         ) : (
                           <div className="flex h-full w-full items-center justify-center bg-muted text-muted-foreground" role="img" aria-label={related.title}>
                             <Headphones className="h-1/3 w-1/3" strokeWidth={1.5} />
                           </div>
                         )}
                       </div>
-                      <CardContent className="flex flex-col gap-2 p-4">
+                      <CardContent className="flex min-w-0 flex-col gap-1.5 p-3">
                         <h3 className="font-semibold text-foreground" style={{ color: '#154B95' }}>{related.title}</h3>
                         <p className="text-xs" style={{ color: '#154B95' }}>{related.genre || "Khác"} • {related.episodes || 1} tập</p>
                         <p className="line-clamp-2 text-justify text-sm" style={{ color: '#154B95' }}>{related.description || "Chưa có mô tả."}</p>

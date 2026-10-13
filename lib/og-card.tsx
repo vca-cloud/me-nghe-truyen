@@ -14,7 +14,7 @@ export async function renderOgCard({ title, subtitle, coverUrl }: { title: strin
       <div style={{ width: "100%", height: "100%", display: "flex", background: "linear-gradient(135deg, #102D54 0%, #154B95 60%, #2D74A8 100%)", color: "#FFFFFF", fontFamily: "BeVietnamPro", padding: 64 }}>
         {coverUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={coverUrl} alt="" width={440} height={440} style={{ width: 440, height: 440, borderRadius: 32, objectFit: "cover", marginRight: 56, alignSelf: "center" }} />
+          <img src={coverUrl} alt="" width={400} height={500} style={{ width: 400, height: 500, borderRadius: 28, objectFit: "cover", marginRight: 56, alignSelf: "center" }} />
         ) : null}
         <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", flex: 1 }}>
           <div style={{ display: "flex", fontSize: 44, letterSpacing: -1 }}>

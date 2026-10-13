@@ -2,7 +2,7 @@
 
 ## Tổng quan
 
-`me-nghe-truyen` (https://menghetruyen.com) là ứng dụng web nghe truyện audio bằng Next.js App Router. Nội dung và hoạt động lưu trên Supabase (Postgres, Auth, RLS); audio/ảnh bìa là URL công khai trên Cloudflare R2 (hiện dán thủ công, host `r2.dev`). Doanh thu từ link affiliate Shopee: người nghe phải bấm link trước khi nghe trọn truyện.
+`me-nghe-truyen` (https://menghetruyen.com) là ứng dụng web nghe truyện audio bằng Next.js App Router. Nội dung và hoạt động lưu trên Supabase (Postgres, Auth, RLS); audio/ảnh bìa là URL công khai trên Cloudflare R2 (host `r2.dev`; admin chọn audio từ R2 và tải ảnh bìa lên R2 ngay trong form, vẫn dán link tay được). Doanh thu từ link affiliate Shopee: người nghe phải bấm link trước khi nghe trọn truyện.
 
 Chủ dự án không phải lập trình viên: tự làm mọi việc có thể; bước nào cần họ (dashboard Supabase/Vercel/Cloudflare, push, thử trên điện thoại) thì hướng dẫn từng cú bấm bằng tiếng Việt. Họ tự push bằng VS Code (Source Control → Sync Changes) vì shell không có quyền GitHub.
 
@@ -46,7 +46,9 @@ NEXT_PUBLIC_R2_PUBLIC_URL=
 NEXT_PUBLIC_SITE_URL=https://menghetruyen.com
 CLOUDFLARE_API_TOKEN=        # chỉ quyền Account Analytics: Read (đã đặt trên Vercel)
 CLOUDFLARE_ACCOUNT_ID=       # (đã đặt trên Vercel)
-R2_BUCKET_NAME=              # tùy chọn; bỏ trống = cộng mọi bucket
+R2_BUCKET_NAME=              # bucket audio/ảnh; bắt buộc cho chọn audio + tải ảnh bìa (usage chỉ đếm bucket này)
+R2_ACCESS_KEY_ID=            # R2 API token Object Read & Write cho bucket trên (chỉ server)
+R2_SECRET_ACCESS_KEY=
 # USAGE_LIMIT_* ghi đè hạn mức gói Free (xem app/api/admin/usage/route.ts)
 ```
 
@@ -75,6 +77,8 @@ app/
     ├── affiliate-links/{active,preview}/, affiliate-links/[id]/click/  # click: đếm + ghi event + set cookie mở khóa
     ├── account/profile/, favorites/, listening-history/, sync-user/
     ├── admin/{login,logout,db,analytics,usage,stories,staffs,users}/, admin/users/sync/
+    ├── admin/r2/list/               # Duyệt bucket R2 (thư mục + file audio) cho admin
+    ├── admin/r2/upload/             # Trả presigned PUT (10 phút) cho ảnh bìa covers/*.webp
     └── backup/
 
 components/
@@ -84,7 +88,7 @@ components/
 ├── track/{player,episode-list,track-actions,track-experience}.tsx
 ├── admin/                           # admin-shell, action-buttons, audio-form-dialog, affiliate-manager,
 │                                    # category-manager, import-stories-dialog, affiliate-funnel,
-│                                    # detailed-report, system-usage
+│                                    # detailed-report, system-usage, cover-uploader, r2-audio-picker
 └── ui/                              # shadcn/ui primitives
 
 lib/
@@ -94,6 +98,7 @@ lib/
 ├── home-stories.ts, track-data.ts, story-views.ts, duration.ts, import-stories.ts, slug.ts, utils.ts (formatDateVN)
 ├── analytics.ts (trackEvent → gtag), local-progress.ts, og-card.tsx, site-url.ts, signup-validation.ts, sync-admin-user.ts
 ├── affiliate-api.ts, category-data.ts, category-options.ts, categories.ts
+├── r2.ts (aws4fetch: listR2, presignPut, publicUrlFor), image-to-webp.ts (cắt 4:5 → WebP), episode-order.ts
 └── social-proof.ts                  # không được import ở đâu
 
 proxy.ts                             # Chỉ bảo vệ trang /admin/* (trừ /admin/login); KHÔNG bảo vệ /api/*
@@ -183,6 +188,13 @@ Dashboard `/admin/analytics` (`app/api/admin/analytics/route.ts`, đọc toàn b
 
 Nút/nhãn "Khóa" nếu còn trong UI chưa phải cơ chế phân quyền nội dung hoàn chỉnh.
 
+## Ảnh bìa và audio từ R2
+
+- Ảnh bìa tỷ lệ **4:5** ở mọi nơi (thẻ trang chủ, danh sách, track, player, truyện liên quan, ảnh OG 400×500). Truyện chưa có ảnh hiện khung 4:5 nền `#154B95` + icon tai nghe.
+- Form truyện (`components/admin/audio-form-dialog.tsx`): `CoverUploader` cắt giữa 4:5, thu về 1080×1350, mã hóa WebP 0.85 (JPEG nếu trình duyệt không hỗ trợ) ngay trên trình duyệt, rồi PUT thẳng lên R2 qua presigned URL (`covers/<slug>-<time>.webp`). Cần CORS bucket cho `PUT` từ `https://menghetruyen.com` và `http://localhost:3000`, header `Content-Type`.
+- Audio: chủ dự án tự upload lên R2 bằng dashboard Cloudflare. Quy ước: truyện 1 tập = 1 file; truyện nhiều tập = 1 thư mục tên truyện chứa `01.mp3`, `02.mp3`… `R2AudioPicker` chọn file hoặc "Dùng thư mục"; `orderEpisodes` sắp theo **số** trong tên (2 < 10), số tập = số trong tên nếu đủ và không trùng, ngược lại 1..n; tiêu đề `Tập N`; tên thư mục điền vào tiêu đề nếu đang trống; duration tự đo từng tập.
+- API R2 trả 503 kèm hướng dẫn khi thiếu `R2_ACCESS_KEY_ID`/`R2_SECRET_ACCESS_KEY`/`R2_BUCKET_NAME`.
+
 ## Import và duration
 
 `lib/import-stories.ts` parse JSON lồng và CSV (parser stateful, hỗ trợ dấu phẩy, ngoặc kép, newline trong field). File mẫu [public/mau-import-truyen.csv](public/mau-import-truyen.csv):
@@ -214,7 +226,7 @@ RLS production: `admin_users` chỉ service_role; `staffs` API disabled; `favori
 
 ## Known limitations và kiểm thử
 
-- Audio/cover dán URL công khai `r2.dev` (giới hạn tốc độ, không dành cho production); chưa upload thẳng lên R2 từ form; 15 truyện chưa có ảnh bìa. Audio MP3 ~125 kbps — nén 64 kbps mono sẽ giảm ~50% dung lượng (đề xuất, chưa làm).
+- Audio/cover dán URL công khai `r2.dev` (giới hạn tốc độ, không dành cho production); audio vẫn upload bằng dashboard Cloudflare (form chỉ chọn); 15 truyện chưa có ảnh bìa. Audio MP3 ~125 kbps — nén 64 kbps mono sẽ giảm ~50% dung lượng (đề xuất, chưa làm).
 - Chưa có playlist, shuffle, tự chuyển tập, merge tiến độ guest lên server sau login.
 - Cần kiểm thử thủ công trên điện thoại: màn hình khóa, hẹn giờ tắt, bấm Phát → popup → Shopee → nghe.
 - Trước khi hoàn tất: `npm run build`, `npm run lint` (0 error; còn ~27 warning cũ), `git diff --check`. Với react-hooks `set-state-in-effect`: tải dữ liệu lúc mount bằng hàm fetch thuần + `.then(setState)`, reset state theo prop bằng điều chỉnh trong render.

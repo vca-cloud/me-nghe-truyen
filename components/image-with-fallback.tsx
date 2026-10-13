@@ -54,7 +54,7 @@ export function ImageWithFallback({
         src={src}
         alt={alt}
         width={720}
-        height={720}
+        height={900}
         sizes={sizes}
         priority={priority}
         className={className}
