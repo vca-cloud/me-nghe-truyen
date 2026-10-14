@@ -6,10 +6,14 @@ import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { adminWrite } from "@/lib/admin-db"
-import { FEATURED_SLOTS, pickTopStories } from "@/lib/featured"
-import { totalViewsFor } from "@/lib/story-views"
+import { FEATURED_SLOTS, alignTopViews, pickTopStories } from "@/lib/featured"
+import { realViewsFor } from "@/lib/story-views"
 
-type Story = { id: number; title: string; featured_rank?: number | null; real_views?: number | null; base_fake_views?: number | null }
+type Story = { id: number; title: string; featured_rank?: number | null; real_views?: number | null; base_fake_views?: number | null; plays?: string | number | null }
+
+// Giống trang chủ (lib/home-stories.ts): base_fake_views, thiếu thì lấy plays cũ.
+const fakeOf = (story: Story) => Number(story.base_fake_views ?? story.plays ?? 0) || 0
+const totalOf = (story: Story) => realViewsFor(story) + fakeOf(story)
 
 const AUTO = ""
 
@@ -29,14 +33,21 @@ export function FeaturedPicker({ stories, onSaved }: { stories: Story[]; onSaved
   const slots = draft ?? saved
   const dirty = slots.some((value, index) => value !== saved[index])
 
-  const sorted = useMemo(() => [...stories].sort((a, b) => totalViewsFor(b) - totalViewsFor(a)), [stories])
+  const sorted = useMemo(() => [...stories].sort((a, b) => totalOf(b) - totalOf(a)), [stories])
   const preview = useMemo(() => {
     const ranked = stories.map((story) => {
       const slot = slots.indexOf(String(story.id))
-      return { ...story, featured_rank: slot >= 0 ? slot + 1 : null }
+      // pickTopStories xếp ô tự động theo real_views + base_fake_views → đưa giá trị đã tính plays vào.
+      return { ...story, base_fake_views: fakeOf(story), featured_rank: slot >= 0 ? slot + 1 : null }
     })
     return pickTopStories(ranked)
   }, [stories, slots])
+  const increases = useMemo(() => {
+    const topIds = new Set(preview.map((story) => story.id))
+    const othersMax = Math.max(0, ...stories.filter((story) => !topIds.has(story.id)).map(totalOf))
+    return alignTopViews(preview.map((story) => ({ id: story.id, total: totalOf(story) })), othersMax)
+  }, [preview, stories])
+  const needsAlign = increases.size > 0
 
   const choose = (index: number, value: string) => {
     const next = [...slots]
@@ -62,7 +73,13 @@ export function FeaturedPicker({ stories, onSaved }: { stories: Story[]; onSaved
         const { error } = await adminWrite({ table: "stories", op: "update", values: { featured_rank: rank }, match: { id: Number(id) } })
         if (error) throw new Error(error.message)
       }
-      toast.success("Đã lưu Top 4. Trang chủ cập nhật trong khoảng 1 phút.")
+      for (const [id, add] of increases) {
+        const story = stories.find((item) => item.id === id)
+        if (!story) continue
+        const { error } = await adminWrite({ table: "stories", op: "update", values: { base_fake_views: fakeOf(story) + add }, match: { id } })
+        if (error) throw new Error(error.message)
+      }
+      toast.success(`Đã lưu Top 4${increases.size ? `, căn lại lượt nghe ${increases.size} truyện` : ""}. Trang chủ cập nhật trong khoảng 1 phút.`)
       setDraft(null)
       onSaved()
     } catch (error) {
@@ -96,15 +113,26 @@ export function FeaturedPicker({ stories, onSaved }: { stories: Story[]; onSaved
                   >
                     <option value={AUTO}>Tự động (theo lượt nghe)</option>
                     {sorted.map((story) => (
-                      <option key={story.id} value={String(story.id)}>{story.title} · {totalViewsFor(story).toLocaleString("vi-VN")} lượt</option>
+                      <option key={story.id} value={String(story.id)}>{story.title} · {totalOf(story).toLocaleString("vi-VN")} lượt</option>
                     ))}
                   </select>
+                  {preview[index] && (
+                    <span className="block text-xs text-muted-foreground">
+                      Lượt nghe hiển thị: {totalOf(preview[index]).toLocaleString("vi-VN")}
+                      {increases.get(preview[index].id) ? <b className="text-[#EE4D2D]"> → {(totalOf(preview[index]) + increases.get(preview[index].id)!).toLocaleString("vi-VN")} (+{increases.get(preview[index].id)!.toLocaleString("vi-VN")})</b> : null}
+                    </span>
+                  )}
                 </label>
               ))}
             </div>
+            {needsAlign && (
+              <p className="text-xs text-muted-foreground">
+                Để lượt nghe hiển thị đúng thứ tự (#1 &gt; #2 &gt; #3 &gt; #4 &gt; các truyện khác), khi lưu sẽ cộng thêm lượt nghe ảo cho truyện có số màu cam. Chỉ tăng, không giảm; lượt nghe thật giữ nguyên.
+              </p>
+            )}
             <div className="flex flex-wrap items-center gap-2">
-              <Button type="button" disabled={!dirty || saving} onClick={() => void save()}>
-                {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Lưu Top 4
+              <Button type="button" disabled={(!dirty && !needsAlign) || saving} onClick={() => void save()}>
+                {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{dirty ? "Lưu Top 4" : needsAlign ? "Căn lại lượt nghe" : "Lưu Top 4"}
               </Button>
               {dirty && <Button type="button" variant="ghost" disabled={saving} onClick={() => setDraft(null)}>Hủy thay đổi</Button>}
               <Button type="button" variant="outline" disabled={saving} onClick={() => setDraft(Array(FEATURED_SLOTS).fill(AUTO))}>Tất cả tự động</Button>

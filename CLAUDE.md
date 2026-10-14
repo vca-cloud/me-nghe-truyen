@@ -117,7 +117,7 @@ scripts/lock-staffs-rls.mjs          # Script cũ khóa RLS staff
 total views = real_views + base_fake_views
 ```
 
-`base_fake_views` có thể fallback từ `plays` legacy; `plays` không cộng thêm. Mọi nơi hiển thị/tính view dùng `lib/story-views.ts`; đổi mô hình thì rà soát trang chủ, track và admin analytics cùng lúc. Không tự đồng bộ ngược giá trị view.
+`base_fake_views` có thể fallback từ `plays` legacy; `plays` không cộng thêm. Mọi nơi hiển thị/tính view dùng `lib/story-views.ts`; đổi mô hình thì rà soát trang chủ, track và admin analytics cùng lúc. Không tự đồng bộ ngược giá trị view — ngoại lệ duy nhất: khi admin bấm Lưu Top 4/"Căn lại lượt nghe", `alignTopViews` (`lib/featured.ts`) **chỉ tăng** `base_fake_views` (khoảng cách ~3%, tối thiểu 7) để tổng hiển thị #1 > #2 > #3 > #4 > mọi truyện khác; có xem trước số tăng trong khung trước khi lưu. Lượt nghe thật tăng dần có thể làm lệch lại thứ tự → khung hiện nút "Căn lại lượt nghe".
 
 `real_views` tăng qua `/api/increment-views` (gọi khi bấm link affiliate) → RPC `record_story_listen`: chống trùng 30 phút theo IP + truyện, ghi `listener_logs`, cộng nguyên tử. `listener_logs` chỉ có dữ liệu từ 2026-09-24 (trước đó bảng chưa tồn tại trên production).
 
