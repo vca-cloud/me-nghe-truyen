@@ -24,7 +24,10 @@ export function CoverUploader({ value, onChange, storyTitle }: Props) {
       })
       const data = await response.json()
       if (!response.ok) throw new Error(data?.error || "Không tạo được link tải lên")
-      const put = await fetch(data.uploadUrl, { method: "PUT", headers: { "Content-Type": blob.type }, body: blob })
+      // Trình duyệt chặn (CORS chưa đặt/sai) thì fetch ném TypeError "Failed to fetch", không có mã lỗi.
+      const put = await fetch(data.uploadUrl, { method: "PUT", headers: { "Content-Type": blob.type }, body: blob }).catch(() => {
+        throw new Error(`R2 chặn tải lên từ ${window.location.origin}: bucket chưa đặt CORS (Cloudflare → R2 → bucket → Settings → CORS Policy).`)
+      })
       if (!put.ok) throw new Error(`R2 từ chối tải lên (${put.status}). Kiểm tra CORS của bucket.`)
       onChange(data.publicUrl)
       toast.success(`Đã tải ảnh bìa ${width}×${height} (${blob.type === "image/webp" ? "WebP" : "JPEG"}, ${Math.round(blob.size / 1024)} KB)`)
