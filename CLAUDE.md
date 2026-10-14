@@ -100,6 +100,7 @@ lib/
 ├── home-stories.ts, track-data.ts, story-views.ts, duration.ts, import-stories.ts, slug.ts, utils.ts (formatDateVN)
 ├── analytics.ts (trackEvent → gtag), local-progress.ts, og-card.tsx, site-url.ts, signup-validation.ts, sync-admin-user.ts
 ├── issue-reports.ts (ISSUE_KINDS, describeMediaError), affiliate-api.ts, category-data.ts, category-options.ts, categories.ts
+├── featured.ts (pickTopStories, FEATURED_SLOTS), r2-public.ts (R2_PUBLIC_URL mặc định)
 ├── r2.ts (aws4fetch: listR2, presignPut, publicUrlFor), image-to-webp.ts (cắt 4:5 → WebP), episode-order.ts
 └── social-proof.ts                  # không được import ở đâu
 
@@ -110,7 +111,7 @@ scripts/lock-staffs-rls.mjs          # Script cũ khóa RLS staff
 
 ## Trang chủ và lượt nghe
 
-`app/page.tsx` là server component (`revalidate = 60`) gọi `getHomeStories()` (service role, chỉ cột cần, không có `audio_url`) rồi truyền `initialStories` cho `components/home-page.tsx`. Client tìm kiếm theo tiêu đề/tác giả/thể loại/mô tả, lọc thể loại, phân trang 6 truyện; chỉ gọi lại `/api/home-stories` (ISR 60s) khi tab focus/visible hoặc khi server không lấy được dữ liệu. Danh sách theo `id DESC`. Khu **Được nghe nhiều** sort theo:
+`app/page.tsx` là server component (`revalidate = 60`) gọi `getHomeStories()` (service role, chỉ cột cần, không có `audio_url`) rồi truyền `initialStories` cho `components/home-page.tsx`. Client tìm kiếm theo tiêu đề/tác giả/thể loại/mô tả, lọc thể loại, phân trang 6 truyện; chỉ gọi lại `/api/home-stories` (ISR 60s) khi tab focus/visible hoặc khi server không lấy được dữ liệu. Danh sách theo `id DESC`. Khu **Được nghe nhiều** (4 truyện, `pickTopStories` trong `lib/featured.ts`): truyện admin ghim (`stories.featured_rank` 1–4, chọn ở `/admin/audio` → `FeaturedPicker`) đứng đúng vị trí; ô không ghim lấy truyện nhiều lượt nghe nhất theo:
 
 ```text
 total views = real_views + base_fake_views
@@ -173,7 +174,7 @@ Signup (`components/signup-form.tsx`, `lib/signup-validation.ts`): tiếng Việ
 
 | Route | Chức năng |
 | --- | --- |
-| `/admin/audio` | CRUD truyện/tập, import CSV/JSON |
+| `/admin/audio` | CRUD truyện/tập, import CSV/JSON, chọn Top 4 trang chủ (`components/admin/featured-picker.tsx`) |
 | `/admin/analytics` | Dashboard (mô tả dưới) |
 | `/admin/reports` | Báo lỗi: lọc chưa xử lý/đã xử lý, nhóm "chỗ bị báo lỗi nhiều nhất" theo truyện+tập, mở file audio, đánh dấu đã xử lý (từng cái/cả nhóm), xóa rác; menu có badge số chưa xử lý |
 | `/admin/affiliate` | Link affiliate (`title` hiện ở "Gợi ý hôm nay" trong popup — nên đặt tên sản phẩm) |
@@ -219,6 +220,7 @@ Thứ tự trong `supabase/migrations/` (đã chạy trên production trừ khi 
 - `20250915_record_story_listen.sql` — tạo `listener_logs` nếu thiếu + hàm `record_story_listen` (service_role)
 - `20250916_affiliate_events_and_usage.sql` — bảng `affiliate_events` (impression/click, `visitor_hash` = SHA-256 IP+secret) + hàm `admin_system_usage()` (service_role)
 - `20250917_issue_reports.sql` — bảng `issue_reports` (chỉ service_role). **Chưa chạy trên production tính đến 2026-10-14** — chạy xong thì sửa dòng này
+- `20250918_story_featured_rank.sql` — cột `stories.featured_rank` (1–4, NULL = tự động). **Chưa chạy trên production tính đến 2026-10-14**; `getHomeStories` tự đọc lại không có cột nếu thiếu
 
 RLS production: `admin_users` chỉ service_role; `staffs` API disabled; `favorites`/`listening_history` theo user; nội dung công khai chỉ SELECT. Khi sửa unique/upsert cho row có `episode_id NULL`, lưu ý unique index cho phép nhiều NULL.
 
