@@ -3,10 +3,11 @@
 import Image from "next/image"
 import { Headphones } from "lucide-react"
 import { useState } from "react"
+import { R2_PUBLIC_URL } from "@/lib/r2-public"
 
 const r2Host = (() => {
   try {
-    return new URL(process.env.NEXT_PUBLIC_R2_PUBLIC_URL || "").host
+    return new URL(R2_PUBLIC_URL).host
   } catch {
     return ""
   }

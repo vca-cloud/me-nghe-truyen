@@ -1,4 +1,5 @@
 import { AwsClient } from "aws4fetch"
+import { R2_PUBLIC_URL } from "@/lib/r2-public"
 
 // Truy cập R2 qua S3 API (chỉ phía server). Cần khóa R2 "Object Read & Write" giới hạn đúng bucket.
 export class R2NotConfiguredError extends Error {}
@@ -8,10 +9,10 @@ export function r2Config() {
   const accessKeyId = process.env.R2_ACCESS_KEY_ID?.trim()
   const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY?.trim()
   const bucket = process.env.R2_BUCKET_NAME?.trim()
-  const publicBase = process.env.NEXT_PUBLIC_R2_PUBLIC_URL?.trim().replace(/\/$/, "")
-  if (!accountId || !accessKeyId || !secretAccessKey || !bucket || !publicBase) {
+  const publicBase = R2_PUBLIC_URL
+  if (!accountId || !accessKeyId || !secretAccessKey || !bucket) {
     // Chỉ nêu tên biến thiếu (không bao giờ in giá trị) để chủ dự án biết cần thêm gì trên Vercel.
-    const missing = Object.entries({ CLOUDFLARE_ACCOUNT_ID: accountId, R2_ACCESS_KEY_ID: accessKeyId, R2_SECRET_ACCESS_KEY: secretAccessKey, R2_BUCKET_NAME: bucket, NEXT_PUBLIC_R2_PUBLIC_URL: publicBase })
+    const missing = Object.entries({ CLOUDFLARE_ACCOUNT_ID: accountId, R2_ACCESS_KEY_ID: accessKeyId, R2_SECRET_ACCESS_KEY: secretAccessKey, R2_BUCKET_NAME: bucket })
       .filter(([, value]) => !value).map(([name]) => name)
     throw new R2NotConfiguredError(`Thiếu biến môi trường trên Vercel: ${missing.join(", ")}. Thêm xong phải Redeploy mới có hiệu lực.`)
   }

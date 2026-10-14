@@ -1,8 +1,9 @@
 import type { NextConfig } from "next"
+import { R2_PUBLIC_URL } from "./lib/r2-public"
 
 const r2Url = (() => {
   try {
-    return new URL(process.env.NEXT_PUBLIC_R2_PUBLIC_URL || "")
+    return new URL(R2_PUBLIC_URL)
   } catch {
     return null
   }
