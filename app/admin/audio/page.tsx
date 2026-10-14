@@ -10,6 +10,7 @@ import { Download, Edit, Lock, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 import { AudioFormDialog, type StoryFormValues } from "@/components/admin/audio-form-dialog"
 import { ImportStoriesDialog } from "@/components/admin/import-stories-dialog"
+import { FeaturedPicker } from "@/components/admin/featured-picker"
 import { supabase, type Episode } from "@/lib/supabase"
 import { realViewsFor, fakeViewsFor, totalViewsFor } from "@/lib/story-views"
 import { formatClockDuration } from "@/lib/duration"
@@ -30,6 +31,7 @@ interface Audio {
   real_views?: number | null
   base_fake_views?: number | null
   status: string
+  featured_rank?: number | null
   episodes_list?: Episode[]
 }
 
@@ -159,6 +161,8 @@ export default function AudioPage() {
             <AudioFormDialog onSuccess={handleRefresh} />
           </div>
         </div>
+
+        {!loading && <FeaturedPicker stories={audioList} onSaved={handleRefresh} />}
 
         <div className="flex items-center gap-3">
           <Input placeholder="Tìm kiếm truyện, tác giả..." className="max-w-xs" />

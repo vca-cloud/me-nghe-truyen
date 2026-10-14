@@ -12,6 +12,7 @@ import { Headphones, Play } from "lucide-react"
 import { toast } from "sonner"
 import { getCategoryOptions, type CategoryOption } from "@/lib/category-options"
 import type { HomeStory } from "@/lib/home-stories"
+import { pickTopStories } from "@/lib/featured"
 import { totalViewsFor } from "@/lib/story-views"
 
 function viewsFor(story: Story) {
@@ -106,11 +107,7 @@ export function HomePage({ initialStories }: { initialStories: Story[] | null })
     }
   }, [initialStories])
 
-  const popularStories = useMemo(() => [...stories].sort((a, b) => {
-    const totalA = Number(a.real_views || 0) + Number(a.base_fake_views || 0)
-    const totalB = Number(b.real_views || 0) + Number(b.base_fake_views || 0)
-    return totalB - totalA
-  }), [stories])
+  const popularStories = useMemo(() => pickTopStories(stories), [stories])
 
   const filteredStories = useMemo(() => stories.filter((story) => {
     const query = (submittedSearch || searchTerm).trim().toLowerCase()

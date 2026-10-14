@@ -16,6 +16,7 @@ export interface HomeStory {
   real_views: number
   base_fake_views: number
   status: string
+  featured_rank: number | null
 }
 
 const HOME_COLUMNS = "id, title, author, genre, description, cover_url, episodes, duration, plays, real_views, base_fake_views, status"
@@ -26,7 +27,10 @@ export async function getHomeStories(): Promise<HomeStory[]> {
   if (!url || !serviceRoleKey) throw new Error("Thiếu cấu hình Supabase server.")
 
   const db = createClient(url, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } })
-  const { data, error } = await db.from("stories").select(HOME_COLUMNS).order("id", { ascending: false })
+  const load = (columns: string) => db.from("stories").select(columns).order("id", { ascending: false }).returns<Record<string, unknown>[]>()
+  let { data, error } = await load(`${HOME_COLUMNS}, featured_rank`)
+  // Production chưa chạy migration 20250918 (chưa có cột featured_rank) → đọc như cũ, top 4 theo lượt nghe.
+  if (error?.message.includes("featured_rank")) ({ data, error } = await load(HOME_COLUMNS))
   if (error) throw error
 
   return (data || []).map((story) => ({
@@ -43,5 +47,6 @@ export async function getHomeStories(): Promise<HomeStory[]> {
     base_fake_views: Number(story.base_fake_views ?? story.plays ?? 0),
     status: String(story.status || "Đang cập nhật"),
     slug: slugify(String(story.title || "")) || String(story.id),
+    featured_rank: story.featured_rank != null ? Number(story.featured_rank) : null,
   }))
 }
