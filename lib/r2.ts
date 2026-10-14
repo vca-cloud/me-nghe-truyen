@@ -10,7 +10,10 @@ export function r2Config() {
   const bucket = process.env.R2_BUCKET_NAME?.trim()
   const publicBase = process.env.NEXT_PUBLIC_R2_PUBLIC_URL?.trim().replace(/\/$/, "")
   if (!accountId || !accessKeyId || !secretAccessKey || !bucket || !publicBase) {
-    throw new R2NotConfiguredError("Chưa cấu hình khóa R2 (R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET_NAME) trên Vercel.")
+    // Chỉ nêu tên biến thiếu (không bao giờ in giá trị) để chủ dự án biết cần thêm gì trên Vercel.
+    const missing = Object.entries({ CLOUDFLARE_ACCOUNT_ID: accountId, R2_ACCESS_KEY_ID: accessKeyId, R2_SECRET_ACCESS_KEY: secretAccessKey, R2_BUCKET_NAME: bucket, NEXT_PUBLIC_R2_PUBLIC_URL: publicBase })
+      .filter(([, value]) => !value).map(([name]) => name)
+    throw new R2NotConfiguredError(`Thiếu biến môi trường trên Vercel: ${missing.join(", ")}. Thêm xong phải Redeploy mới có hiệu lực.`)
   }
   return {
     client: new AwsClient({ accessKeyId, secretAccessKey, service: "s3", region: "auto" }),
